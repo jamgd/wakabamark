@@ -1,4 +1,23 @@
 {
   "name": "wakabamark",
-  "packageManager": "yarn@4.16.0"
+  "packageManager": "yarn@4.16.0",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jamgd/wakabamark.git"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "module": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "rm -rf dist && tsc --build"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
 }
