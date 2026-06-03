@@ -316,6 +316,19 @@ export function escapeMarkdownLinkDestination(value: string): string {
   return value.replace(/[()\s]/g, match => encodeURIComponent(match));
 }
 
+// A Markdown `<...>` autolink terminates at the first ">" and may not contain "<", ">", spaces, or
+// control characters. When the href would break that form, the caller should emit "[text](dest)".
+export function isMarkdownAutolinkSafe(href: string): boolean {
+  for (let index = 0; index < href.length; index += 1) {
+    const code = href.charCodeAt(index);
+    if (code <= 0x20 || code === 0x3c || code === 0x3e || code === 0x7f) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export function renderMarkdownCodeSpan(value: string): string {
   // Fold instead of Math.max(...array): spreading hundreds of thousands of backtick-run lengths can
   // exceed the engine's argument limit and throw a RangeError.

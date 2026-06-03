@@ -28,6 +28,7 @@ import {
   isBlockOpeningLine,
   isBlockQuoteLine,
   isIndentedCodeLine,
+  isMarkdownAutolinkSafe,
   isOrderedListStartLine,
   isSafePluginHref,
   isUnorderedListLine,
@@ -202,7 +203,7 @@ function renderInlineMarkdown(node: InlineNode): string {
     case 'code-span':
       return renderMarkdownCodeSpan(node.value);
     case 'link':
-      return node.external
+      return node.external && isMarkdownAutolinkSafe(node.href)
         ? `<${node.href}>`
         : `[${escapeMarkdownLinkText(node.text)}](${escapeMarkdownLinkDestination(node.href)})`;
     case 'post-reference':

@@ -126,6 +126,19 @@ describe('WakabamarkEngine', () => {
     assert.equal(engine.renderMarkdown('See >>123.'), 'See [>>123](/thread/42#reply-123).');
   });
 
+  it('emits a bracketed Markdown link when an autolink URL contains ">"', () => {
+    const engine = new WakabamarkEngine();
+    const input = 'https://example.com/a>b';
+
+    // The <...> autolink form would terminate at the first ">", corrupting the round-trip.
+    assert.equal(engine.renderMarkdown(input), '[https://example.com/a>b](https://example.com/a>b)');
+    // HTML output escapes ">" in the attribute, so it stays a single anchor.
+    assert.equal(
+      engine.renderHtml(input),
+      '<p><a href="https://example.com/a&gt;b" rel="nofollow noopener noreferrer" target="_blank">https://example.com/a&gt;b</a></p>',
+    );
+  });
+
   it('widens the Markdown code-span fence past the longest internal backtick run', () => {
     const engine = new WakabamarkEngine();
 
