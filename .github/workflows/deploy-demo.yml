@@ -1,0 +1,56 @@
+name: Deploy Demo
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-deploy-demo
+  cancel-in-progress: true
+
+jobs:
+  static-analysis:
+    uses: ./.github/workflows/static-analysis.yml
+  
+  unit-tests:
+    uses: ./.github/workflows/unit-tests.yml
+
+  deploy-demo:
+    runs-on: ubuntu-slim
+    needs: [ static-analysis, unit-tests ]
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v6
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: "package.json"
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Build project
+        run: yarn build:demo
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: demo/dist
+      
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

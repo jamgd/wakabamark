@@ -5,7 +5,7 @@
   "files": {
     "ignoreUnknown": true,
     "maxSize": 5242880, // 5 MB
-    "includes": ["**/*.{js,ts,json,jsonc}", "!!**/dist", "!!**/.turbo", "!!.idea", "!!.claude"]
+    "includes": ["**/*.{js,ts,json,jsonc,html,css}", "!!**/dist", "!!**/.turbo", "!!.idea", "!!.claude"]
   },
 
   "formatter": {
