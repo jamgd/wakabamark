@@ -5,7 +5,7 @@ Embeddable [WakabaMark](https://wakaba.c3.cx/docs/docs.html#WakabaMark) engine w
 - Official-style inline syntax: emphasis, strong, code spans, autolinks, optional post references
 - Official-style block syntax: paragraphs, unordered lists, ordered lists, blockquotes, indented code blocks
 - Markdown output from the same AST as HTML output
-- Opt-in imageboard spoiler support
+- Opt-in spoiler support
 - Inline plugin support through `WakabamarkEnginePlugin`
 - Hard denylist for unsafe URL schemes such as `javascript:`
 
@@ -15,9 +15,9 @@ Embeddable [WakabaMark](https://wakaba.c3.cx/docs/docs.html#WakabaMark) engine w
 import { WakabamarkEngine } from 'wakabamark';
 
 const engine = new WakabamarkEngine({
-	profile: 'imageboard',
 	features: {
 		postReferences: true,
+		spoilers: true,
 	},
 	resolvePostReferenceHref: postId => `/thread/42#reply-${postId}`,
 });
@@ -89,9 +89,8 @@ class WakabamarkEngine {
 
 ## Options
 
-- `profile`: `'official' | 'imageboard'`
 - `features.postReferences`: enable or disable `>>123` post-reference parsing, disabled by default
-- `features.spoilers`: force-enable or disable `%%spoiler%%`
+- `features.spoilers`: enable or disable `%%spoiler%%`, disabled by default
 - `resolvePostReferenceHref(postId)`: customize the href for `>>123` when post-reference parsing is enabled
 - `plugins`: register `WakabamarkEnginePlugin[]` for custom inline syntax
 - `allowedUrlProtocols`: allowed external protocols, still filtered by an internal unsafe-scheme denylist

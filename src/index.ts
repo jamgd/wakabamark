@@ -8,5 +8,4 @@ export type {
 	WakabamarkHtmlOptions,
 	WakabamarkInlinePluginContext,
 	WakabamarkInlinePluginMatch,
-	WakabamarkProfile,
 } from './types.js';

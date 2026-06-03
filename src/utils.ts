@@ -84,15 +84,11 @@ export function mergeAdjacentTextNodes(nodes: InlineNode[]): InlineNode[] {
 export function resolveWakabamarkEngineOptions(
 	options: WakabamarkEngineOptions = {},
 ): ResolvedWakabamarkEngineOptions {
-	const profile = options.profile ?? 'official';
-	const spoilersEnabledByProfile = profile === 'imageboard';
-
 	return {
 		allowedUrlProtocols: options.allowedUrlProtocols ?? [...DEFAULT_ALLOWED_URL_PROTOCOLS],
-		profile,
 		features: {
 			postReferences: options.features?.postReferences ?? false,
-			spoilers: options.features?.spoilers ?? spoilersEnabledByProfile,
+			spoilers: options.features?.spoilers ?? false,
 		},
 		html: {
 			externalLinkRel: options.html?.externalLinkRel ?? DEFAULT_EXTERNAL_LINK_REL,

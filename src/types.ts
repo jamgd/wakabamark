@@ -80,8 +80,6 @@ export type PostReferenceNode = {
 
 export type WakabamarkAst = DocumentNode;
 
-export type WakabamarkProfile = 'official' | 'imageboard';
-
 export type WakabamarkFeatureOptions = {
 	postReferences?: boolean;
 	spoilers?: boolean;
@@ -90,7 +88,6 @@ export type WakabamarkFeatureOptions = {
 export type WakabamarkInlinePluginContext = {
 	input: string;
 	start: number;
-	profile: WakabamarkProfile;
 	features: Readonly<{
 		postReferences: boolean;
 		spoilers: boolean;
@@ -127,7 +124,6 @@ export type WakabamarkHtmlOptions = {
 
 export type WakabamarkEngineOptions = {
 	allowedUrlProtocols?: string[];
-	profile?: WakabamarkProfile;
 	features?: WakabamarkFeatureOptions;
 	html?: WakabamarkHtmlOptions;
 	plugins?: readonly WakabamarkEnginePlugin[];
@@ -136,7 +132,6 @@ export type WakabamarkEngineOptions = {
 
 export type ResolvedWakabamarkEngineOptions = {
 	allowedUrlProtocols: string[];
-	profile: WakabamarkProfile;
 	features: {
 		postReferences: boolean;
 		spoilers: boolean;

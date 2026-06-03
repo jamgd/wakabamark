@@ -384,7 +384,6 @@ function tryParseInlinePlugin(
 		const match = plugin.parseInline({
 			input,
 			start,
-			profile: options.profile,
 			features: options.features,
 			resolvePostReferenceHref: options.resolvePostReferenceHref,
 		});

@@ -93,11 +93,18 @@ describe('WakabamarkEngine', () => {
     );
   });
 
-  it('supports opt-in imageboard spoilers and custom post reference resolution', () => {
+  it('keeps spoilers disabled by default', () => {
+    const engine = new WakabamarkEngine();
+
+    assert.equal(engine.renderHtml('%%secret%%'), '<p>%%secret%%</p>');
+    assert.equal(engine.renderMarkdown('%%secret%%'), '%%secret%%');
+  });
+
+  it('supports opt-in spoilers and custom post reference resolution', () => {
     const engine = new WakabamarkEngine({
-      profile: 'imageboard',
       features: {
         postReferences: true,
+        spoilers: true,
       },
       resolvePostReferenceHref: postId => `/thread/42#reply-${postId}`,
     });
