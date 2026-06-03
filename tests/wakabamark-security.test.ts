@@ -93,6 +93,61 @@ describe('WakabamarkEngine security and edge cases', () => {
     assert.throws(() => engine.renderHtml('@alice'), /unsafe href/i);
   });
 
+  it('rejects plugin hrefs that hide a scheme behind control characters', () => {
+    const controlCharLinkPlugin = (href: string): WakabamarkEnginePlugin => ({
+      name: 'control-char-link',
+      parseInline: ({ input, start }) => {
+        if (!input.startsWith('@alice', start)) {
+          return null;
+        }
+
+        return {
+          nodes: [{ type: 'link', href, text: '@alice', external: false }],
+          nextIndex: start + '@alice'.length,
+        };
+      },
+    });
+
+    // Tab/newline/CR inside the scheme survive escapeHtml but are stripped by the browser during
+    // URL resolution, re-forming "javascript:". The href validator must reject them up front.
+    for (const href of ['java\tscript:alert(1)', 'javascript\n:alert(1)', 'javascript\r:alert(1)']) {
+      const engine = new WakabamarkEngine({ plugins: [controlCharLinkPlugin(href)] });
+
+      assert.throws(() => engine.renderHtml('@alice'), /unsafe href/i);
+    }
+  });
+
+  it('rejects protocol-relative hrefs returned by plugins', () => {
+    const protocolRelativePlugin: WakabamarkEnginePlugin = {
+      name: 'protocol-relative-link',
+      parseInline: ({ input, start }) => {
+        if (!input.startsWith('@alice', start)) {
+          return null;
+        }
+
+        return {
+          nodes: [{ type: 'link', href: '//evil.example/phish', text: '@alice', external: false }],
+          nextIndex: start + '@alice'.length,
+        };
+      },
+    };
+
+    const engine = new WakabamarkEngine({ plugins: [protocolRelativePlugin] });
+
+    assert.throws(() => engine.renderHtml('@alice'), /unsafe href/i);
+  });
+
+  it('falls back to plain text when a post-reference resolver returns an unsafe href', () => {
+    const engine = new WakabamarkEngine({
+      features: { postReferences: true },
+      resolvePostReferenceHref: () => 'javascript:alert(1)',
+    });
+
+    // ">>123" must sit inline (leading ">>" at column 0 is parsed as a blockquote instead).
+    assert.equal(engine.renderHtml('See >>123'), '<p>See &gt;&gt;123</p>');
+    assert.equal(engine.renderMarkdown('See >>123'), 'See >>123');
+  });
+
   it('does not run inline plugins inside code spans', () => {
     let pluginMatchedInsideCode = false;
 
@@ -146,5 +201,21 @@ describe('WakabamarkEngine security and edge cases', () => {
     });
 
     assert.throws(() => engine.renderHtml(':wave:'), /unsupported inline node type/i);
+  });
+
+  it('parses large URL-free input in linear time', () => {
+    const engine = new WakabamarkEngine();
+    // A long run of scheme-legal characters is the worst case: the autolink scan used to re-slice
+    // the tail and backtrack across the whole run at every cursor position (O(n^2)).
+    const input = 'a'.repeat(200_000);
+
+    const startedAt = process.hrtime.bigint();
+    const html = engine.renderHtml(input);
+    const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+
+    assert.equal(html, `<p>${input}</p>`);
+    // The previous implementation took ~18s at this size; linear parsing finishes in tens of ms.
+    // The loose bound avoids CI flakiness while still failing loudly if quadratic behaviour returns.
+    assert.ok(elapsedMs < 3000, `expected linear-time parse, took ${elapsedMs.toFixed(0)}ms`);
   });
 });

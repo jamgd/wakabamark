@@ -1,4 +1,4 @@
-import { UNSAFE_URL_PROTOCOLS } from './constants.js';
+import { CODE_INDENT_WIDTH, SPOILER_DELIMITER, UNSAFE_URL_PROTOCOLS } from './constants.js';
 import type {
   BlockNode,
   BlockQuoteNode,
@@ -28,7 +28,9 @@ import {
   isBlockOpeningLine,
   isBlockQuoteLine,
   isIndentedCodeLine,
+  isMarkdownAutolinkSafe,
   isOrderedListStartLine,
+  isSafePluginHref,
   isUnorderedListLine,
   mergeAdjacentTextNodes,
   normalizeInput,
@@ -62,18 +64,6 @@ export class WakabamarkEngine {
     const ast = typeof input === 'string' ? this.parse(input) : input;
 
     return ast.children.map(renderBlockMarkdown).join('\n\n');
-  }
-
-  public html(input: string): string {
-    return this.renderHtml(input);
-  }
-
-  public markdown(input: string): string {
-    return this.renderMarkdown(input);
-  }
-
-  public ast(input: string): WakabamarkAst {
-    return this.parse(input);
   }
 
   public extractPlainText(input: string | WakabamarkAst): string {
@@ -201,7 +191,7 @@ function renderInlineMarkdown(node: InlineNode): string {
     case 'code-span':
       return renderMarkdownCodeSpan(node.value);
     case 'link':
-      return node.external
+      return node.external && isMarkdownAutolinkSafe(node.href)
         ? `<${node.href}>`
         : `[${escapeMarkdownLinkText(node.text)}](${escapeMarkdownLinkDestination(node.href)})`;
     case 'post-reference':
@@ -458,7 +448,7 @@ function tryParseCodeBlock(lines: string[], start: number): { node: CodeBlockNod
       break;
     }
 
-    codeLines.push(line.startsWith('\t') ? line.slice(1) : line.slice(4));
+    codeLines.push(line.startsWith('\t') ? line.slice(1) : line.slice(CODE_INDENT_WIDTH));
     index += 1;
   }
 
@@ -583,23 +573,40 @@ function tryParsePostReference(
     return null;
   }
 
+  // The resolver is developer-supplied, so route its href through the same safety check that core
+  // applies to autolinks and plugin output. If it is unsafe, fall back to rendering ">>NNN" as text.
+  const href = options.resolvePostReferenceHref(postId);
+  if (!isSafePluginHref(href, options.allowedUrlProtocols)) {
+    return null;
+  }
+
   return {
     node: {
       type: 'post-reference',
       postId,
-      href: options.resolvePostReferenceHref(postId),
+      href,
     },
     nextIndex: start + match[0].length,
   };
 }
+
+// Two independent O(n^2) hazards live here, both hit once per cursor position by parseInline:
+//   1. `input.slice(start)` allocated the whole remaining tail every call -> the sticky ('y') flag
+//      anchors exec() at lastIndex with no slice.
+//   2. an unbounded `[a-z0-9+.-]*` before `://` greedily consumes (then backtracks across) an entire
+//      run of scheme-legal chars before failing -> bound it so a non-URL run fails in O(1) per
+//      position. No real URL scheme approaches 64 chars, so this rejects nothing legitimate.
+// Module-scoped and reset before each use; parsing is synchronous, so the shared lastIndex is safe.
+const AUTOLINK_PATTERN = /[a-z][a-z0-9+.-]{0,63}:\/\/[^\s<]+/iy;
 
 function tryParseUrl(
   input: string,
   start: number,
   options: Readonly<ResolvedWakabamarkEngineOptions>,
 ): { node: LinkNode; nextIndex: number } | null {
-  const match = /^[a-z][a-z0-9+.-]*:\/\/[^\s<]+/i.exec(input.slice(start));
-  if (!match) {
+  AUTOLINK_PATTERN.lastIndex = start;
+  const match = AUTOLINK_PATTERN.exec(input);
+  if (!match || match.index !== start) {
     return null;
   }
 
@@ -680,12 +687,13 @@ function tryParseSpoiler(
   start: number,
   options: Readonly<ResolvedWakabamarkEngineOptions>,
 ): { node: SpoilerNode; nextIndex: number } | null {
-  if (!options.features.spoilers || !input.startsWith('%%', start)) {
+  if (!options.features.spoilers || !input.startsWith(SPOILER_DELIMITER, start)) {
     return null;
   }
 
-  const closingIndex = input.indexOf('%%', start + 2);
-  if (closingIndex === -1 || closingIndex === start + 2) {
+  const contentStart = start + SPOILER_DELIMITER.length;
+  const closingIndex = input.indexOf(SPOILER_DELIMITER, contentStart);
+  if (closingIndex === -1 || closingIndex === contentStart) {
     return null;
   }
 
@@ -695,10 +703,10 @@ function tryParseSpoiler(
       children: [
         {
           type: 'text',
-          value: input.slice(start + 2, closingIndex),
+          value: input.slice(contentStart, closingIndex),
         },
       ],
     },
-    nextIndex: closingIndex + 2,
+    nextIndex: closingIndex + SPOILER_DELIMITER.length,
   };
 }

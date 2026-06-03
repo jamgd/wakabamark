@@ -244,8 +244,32 @@ function isTextNode(node: unknown): node is TextNode {
   );
 }
 
-function isSafePluginHref(href: string, allowedUrlProtocols: readonly string[]): boolean {
+function hasControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || code === 0x7f) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function isSafePluginHref(href: string, allowedUrlProtocols: readonly string[]): boolean {
   if (href.trim() !== href || href === '') {
+    return false;
+  }
+
+  // Browsers strip ASCII tab/newline/CR while resolving URLs, so a value such as "java\tscript:"
+  // would re-form "javascript:" once the stripped control char is gone. Reject all C0 controls +
+  // DEL before the scheme test, which would otherwise misclassify these as harmless relative URLs.
+  if (hasControlCharacter(href)) {
+    return false;
+  }
+
+  // Protocol-relative URLs ("//host/...") carry no scheme, so the checks below never see them,
+  // yet they navigate off-origin. Treat them as unsafe rather than as a harmless relative path.
+  if (href.startsWith('//')) {
     return false;
   }
 
@@ -292,8 +316,27 @@ export function escapeMarkdownLinkDestination(value: string): string {
   return value.replace(/[()\s]/g, match => encodeURIComponent(match));
 }
 
+// A Markdown `<...>` autolink terminates at the first ">" and may not contain "<", ">", spaces, or
+// control characters. When the href would break that form, the caller should emit "[text](dest)".
+export function isMarkdownAutolinkSafe(href: string): boolean {
+  for (let index = 0; index < href.length; index += 1) {
+    const code = href.charCodeAt(index);
+    if (code <= 0x20 || code === 0x3c || code === 0x3e || code === 0x7f) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export function renderMarkdownCodeSpan(value: string): string {
-  const maxBacktickRun = Math.max(...Array.from(value.matchAll(/`+/g), match => match[0].length), 0);
+  // Fold instead of Math.max(...array): spreading hundreds of thousands of backtick-run lengths can
+  // exceed the engine's argument limit and throw a RangeError.
+  let maxBacktickRun = 0;
+  for (const match of value.matchAll(/`+/g)) {
+    maxBacktickRun = Math.max(maxBacktickRun, match[0].length);
+  }
+
   const fence = '`'.repeat(maxBacktickRun + 1);
 
   return `${fence}${value}${fence}`;

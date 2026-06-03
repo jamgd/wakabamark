@@ -126,6 +126,36 @@ describe('WakabamarkEngine', () => {
     assert.equal(engine.renderMarkdown('See >>123.'), 'See [>>123](/thread/42#reply-123).');
   });
 
+  it('emits a bracketed Markdown link when an autolink URL contains ">"', () => {
+    const engine = new WakabamarkEngine();
+    const input = 'https://example.com/a>b';
+
+    // The <...> autolink form would terminate at the first ">", corrupting the round-trip.
+    assert.equal(engine.renderMarkdown(input), '[https://example.com/a>b](https://example.com/a>b)');
+    // HTML output escapes ">" in the attribute, so it stays a single anchor.
+    assert.equal(
+      engine.renderHtml(input),
+      '<p><a href="https://example.com/a&gt;b" rel="nofollow noopener noreferrer" target="_blank">https://example.com/a&gt;b</a></p>',
+    );
+  });
+
+  it('widens the Markdown code-span fence past the longest internal backtick run', () => {
+    const engine = new WakabamarkEngine();
+
+    // Opening with four backticks captures "x```y"; the fence must grow to four to stay balanced.
+    assert.equal(engine.renderHtml('````x```y````'), '<p><code>x```y</code></p>');
+    assert.equal(engine.renderMarkdown('````x```y````'), '````x```y````');
+  });
+
+  it('renders code spans with very many backtick groups without throwing', () => {
+    const engine = new WakabamarkEngine();
+    // Single backticks separated by "a" produce one regex match each; the old Math.max(...array)
+    // spread could exceed the engine's argument limit and throw for this many groups.
+    const input = `\`\`a${'`a'.repeat(200_000)}\`\``;
+
+    assert.doesNotThrow(() => engine.renderMarkdown(input));
+  });
+
   it('never turns unsafe protocols into links even when explicitly allowed', () => {
     const engine = new WakabamarkEngine({
       allowedUrlProtocols: ['javascript:'],

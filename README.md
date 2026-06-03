@@ -80,9 +80,6 @@ class WakabamarkEngine {
 	parse(input: string): WakabamarkAst;
 	renderHtml(input: string | WakabamarkAst): string;
 	renderMarkdown(input: string | WakabamarkAst): string;
-	html(input: string): string;
-	markdown(input: string): string;
-	ast(input: string): WakabamarkAst;
 	extractPlainText(input: string | WakabamarkAst): string;
 }
 ```
@@ -100,11 +97,17 @@ class WakabamarkEngine {
 
 ## Security model
 
+- **HTML output is the security boundary.** Input is escaped at every render leaf, so the HTML is safe to embed directly.
+- **Markdown output is for storage and round-tripping, not sanitization.** Its safety depends entirely on the downstream renderer, so always render it with a trusted, sanitizing CommonMark renderer before display.
 - Raw HTML from input is escaped, not passed through.
 - HTML and Markdown are rendered from a typed AST, not by direct regex-to-HTML substitution.
 - Dangerous protocols are never linkified, even if they are explicitly listed in `allowedUrlProtocols`.
 - Plugin output is validated before it enters the AST; unsafe hrefs and unsupported node types are rejected.
 - Code spans and indented code blocks bypass further inline formatting.
+
+## Markdown round-trip
+
+Markdown output escapes inline constructs, but it does **not** escape line-leading block markers such as `>`, `#`, `|`, `~`, or a leading `-`/`1.`. A downstream CommonMark renderer may therefore reinterpret some text as a blockquote, heading, table, or list. This is a fidelity limitation rather than a security one (HTML is the security boundary); if exact round-tripping matters, render the Markdown only with a renderer whose behavior you control.
 
 ## Development
 

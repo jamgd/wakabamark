@@ -17,6 +17,9 @@ on:
 
 run-name: Static Analysis (${{ github.head_ref || github.ref_name }})
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-slim
