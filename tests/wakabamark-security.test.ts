@@ -202,4 +202,20 @@ describe('WakabamarkEngine security and edge cases', () => {
 
     assert.throws(() => engine.renderHtml(':wave:'), /unsupported inline node type/i);
   });
+
+  it('parses large URL-free input in linear time', () => {
+    const engine = new WakabamarkEngine();
+    // A long run of scheme-legal characters is the worst case: the autolink scan used to re-slice
+    // the tail and backtrack across the whole run at every cursor position (O(n^2)).
+    const input = 'a'.repeat(200_000);
+
+    const startedAt = process.hrtime.bigint();
+    const html = engine.renderHtml(input);
+    const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+
+    assert.equal(html, `<p>${input}</p>`);
+    // The previous implementation took ~18s at this size; linear parsing finishes in tens of ms.
+    // The loose bound avoids CI flakiness while still failing loudly if quadratic behaviour returns.
+    assert.ok(elapsedMs < 3000, `expected linear-time parse, took ${elapsedMs.toFixed(0)}ms`);
+  });
 });

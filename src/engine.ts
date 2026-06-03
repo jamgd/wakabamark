@@ -601,13 +601,23 @@ function tryParsePostReference(
   };
 }
 
+// Two independent O(n^2) hazards live here, both hit once per cursor position by parseInline:
+//   1. `input.slice(start)` allocated the whole remaining tail every call -> the sticky ('y') flag
+//      anchors exec() at lastIndex with no slice.
+//   2. an unbounded `[a-z0-9+.-]*` before `://` greedily consumes (then backtracks across) an entire
+//      run of scheme-legal chars before failing -> bound it so a non-URL run fails in O(1) per
+//      position. No real URL scheme approaches 64 chars, so this rejects nothing legitimate.
+// Module-scoped and reset before each use; parsing is synchronous, so the shared lastIndex is safe.
+const AUTOLINK_PATTERN = /[a-z][a-z0-9+.-]{0,63}:\/\/[^\s<]+/iy;
+
 function tryParseUrl(
   input: string,
   start: number,
   options: Readonly<ResolvedWakabamarkEngineOptions>,
 ): { node: LinkNode; nextIndex: number } | null {
-  const match = /^[a-z][a-z0-9+.-]*:\/\/[^\s<]+/i.exec(input.slice(start));
-  if (!match) {
+  AUTOLINK_PATTERN.lastIndex = start;
+  const match = AUTOLINK_PATTERN.exec(input);
+  if (!match || match.index !== start) {
     return null;
   }
 
