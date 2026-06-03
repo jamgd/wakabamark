@@ -267,6 +267,12 @@ function isSafePluginHref(href: string, allowedUrlProtocols: readonly string[]):
     return false;
   }
 
+  // Protocol-relative URLs ("//host/...") carry no scheme, so the checks below never see them,
+  // yet they navigate off-origin. Treat them as unsafe rather than as a harmless relative path.
+  if (href.startsWith('//')) {
+    return false;
+  }
+
   if (!/^[a-z][a-z0-9+.-]*:/i.test(href)) {
     return true;
   }

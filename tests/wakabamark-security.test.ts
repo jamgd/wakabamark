@@ -117,6 +117,26 @@ describe('WakabamarkEngine security and edge cases', () => {
     }
   });
 
+  it('rejects protocol-relative hrefs returned by plugins', () => {
+    const protocolRelativePlugin: WakabamarkEnginePlugin = {
+      name: 'protocol-relative-link',
+      parseInline: ({ input, start }) => {
+        if (!input.startsWith('@alice', start)) {
+          return null;
+        }
+
+        return {
+          nodes: [{ type: 'link', href: '//evil.example/phish', text: '@alice', external: false }],
+          nextIndex: start + '@alice'.length,
+        };
+      },
+    };
+
+    const engine = new WakabamarkEngine({ plugins: [protocolRelativePlugin] });
+
+    assert.throws(() => engine.renderHtml('@alice'), /unsafe href/i);
+  });
+
   it('does not run inline plugins inside code spans', () => {
     let pluginMatchedInsideCode = false;
 
