@@ -5,6 +5,7 @@ import {
 	escapeMarkdownLinkDestination,
 	escapeMarkdownLinkText,
 	escapeMarkdownText,
+	assertValidInlinePluginMatch,
 	isBlankLine,
 	isBlockOpeningLine,
 	isBlockQuoteLine,
@@ -310,6 +311,15 @@ function parseInline(
 			continue;
 		}
 
+		const pluginMatch = tryParseInlinePlugin(input, cursor, options);
+		if (pluginMatch) {
+			pushPendingText(nodes, input, textStart, cursor);
+			nodes.push(...pluginMatch.nodes);
+			cursor = pluginMatch.nextIndex;
+			textStart = cursor;
+			continue;
+		}
+
 		if (options.features.postReferences) {
 			const postReference = tryParsePostReference(input, cursor, options);
 			if (postReference) {
@@ -363,6 +373,30 @@ function parseInline(
 	pushPendingText(nodes, input, textStart, input.length);
 
 	return mergeAdjacentTextNodes(nodes);
+}
+
+function tryParseInlinePlugin(
+	input: string,
+	start: number,
+	options: Readonly<ResolvedWakabamarkEngineOptions>,
+): { nodes: InlineNode[]; nextIndex: number } | null {
+	for (const plugin of options.plugins) {
+		const match = plugin.parseInline({
+			input,
+			start,
+			profile: options.profile,
+			features: options.features,
+			resolvePostReferenceHref: options.resolvePostReferenceHref,
+		});
+		if (!match) {
+			continue;
+		}
+
+		assertValidInlinePluginMatch(plugin.name, match, start, input.length, options);
+		return match;
+	}
+
+	return null;
 }
 
 function tryParseParagraph(

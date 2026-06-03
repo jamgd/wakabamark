@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { WakabamarkEngine } from '../src/index.ts';
+import {
+	WakabamarkEngine,
+	type WakabamarkEnginePlugin,
+} from '../src/index.ts';
 
 describe('WakabamarkEngine security and edge cases', () => {
 	it('preserves list continuation lines safely', () => {
@@ -34,5 +37,129 @@ describe('WakabamarkEngine security and edge cases', () => {
 			'<p>&amp;lt;img src=x onerror=alert(1)&amp;gt;</p>',
 		);
 		assert.equal(engine.renderMarkdown(input), input);
+	});
+
+	it('rejects duplicate plugin names during engine construction', () => {
+		const duplicatePlugin: WakabamarkEnginePlugin = {
+			name: 'mentions',
+			parseInline: () => null,
+		};
+
+		assert.throws(
+			() =>
+				new WakabamarkEngine({
+					plugins: [duplicatePlugin, duplicatePlugin],
+				}),
+			/duplicate plugin name/i,
+		);
+	});
+
+	it('rejects plugin parsers that do not advance the cursor', () => {
+		const stuckPlugin: WakabamarkEnginePlugin = {
+			name: 'stuck',
+			parseInline: ({ input, start }) => {
+				if (input[start] !== '@') {
+					return null;
+				}
+
+				return {
+					nodes: [{ type: 'text', value: '@' }],
+					nextIndex: start,
+				};
+			},
+		};
+
+		const engine = new WakabamarkEngine({
+			plugins: [stuckPlugin],
+		});
+
+		assert.throws(() => engine.renderHtml('@alice'), /must advance past start/i);
+	});
+
+	it('rejects unsafe hrefs returned by plugins', () => {
+		const unsafeLinkPlugin: WakabamarkEnginePlugin = {
+			name: 'unsafe-link',
+			parseInline: ({ input, start }) => {
+				if (!input.startsWith('@alice', start)) {
+					return null;
+				}
+
+				return {
+					nodes: [
+						{
+							type: 'link',
+							href: 'javascript:alert(1)',
+							text: '@alice',
+							external: false,
+						},
+					],
+					nextIndex: start + '@alice'.length,
+				};
+			},
+		};
+
+		const engine = new WakabamarkEngine({
+			plugins: [unsafeLinkPlugin],
+		});
+
+		assert.throws(() => engine.renderHtml('@alice'), /unsafe href/i);
+	});
+
+	it('does not run inline plugins inside code spans', () => {
+		let pluginMatchedInsideCode = false;
+
+		const mentionPlugin: WakabamarkEnginePlugin = {
+			name: 'mentions',
+			parseInline: ({ input, start }) => {
+				if (!input.startsWith('@alice', start)) {
+					return null;
+				}
+
+				pluginMatchedInsideCode = true;
+				return {
+					nodes: [
+						{
+							type: 'link',
+							href: '/users/alice',
+							text: '@alice',
+							external: false,
+						},
+					],
+					nextIndex: start + '@alice'.length,
+				};
+			},
+		};
+
+		const engine = new WakabamarkEngine({
+			plugins: [mentionPlugin],
+		});
+
+		assert.equal(
+			engine.renderHtml('Use `@alice` here.'),
+			'<p>Use <code>@alice</code> here.</p>',
+		);
+		assert.equal(pluginMatchedInsideCode, false);
+	});
+
+	it('rejects unsupported custom inline node types from plugins in v1', () => {
+		const customNodePlugin: WakabamarkEnginePlugin = {
+			name: 'emoji',
+			parseInline: ({ input, start }) => {
+				if (!input.startsWith(':wave:', start)) {
+					return null;
+				}
+
+				return {
+					nodes: [{ type: 'emoji', value: 'wave' } as never],
+					nextIndex: start + ':wave:'.length,
+				};
+			},
+		};
+
+		const engine = new WakabamarkEngine({
+			plugins: [customNodePlugin],
+		});
+
+		assert.throws(() => engine.renderHtml(':wave:'), /unsupported inline node type/i);
 	});
 });

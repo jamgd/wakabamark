@@ -25,6 +25,8 @@
 - Unsafe URL schemes must never become links, even if a caller includes them in `allowedUrlProtocols`.
 - Code spans and indented code blocks must suppress further inline formatting.
 - `features.postReferences` is opt-in.
+- `WakabamarkEnginePlugin` is inline-only in v1 and may emit only built-in inline nodes.
+- Core, not plugins, owns escaping and href safety checks for plugin output.
 
 ## Change checklist
 

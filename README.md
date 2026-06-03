@@ -6,6 +6,7 @@ Embeddable [WakabaMark](https://wakaba.c3.cx/docs/docs.html#WakabaMark) engine w
 - Official-style block syntax: paragraphs, unordered lists, ordered lists, blockquotes, indented code blocks
 - Markdown output from the same AST as HTML output
 - Opt-in imageboard spoiler support
+- Inline plugin support through `WakabamarkEnginePlugin`
 - Hard denylist for unsafe URL schemes such as `javascript:`
 
 ## Usage
@@ -24,6 +25,51 @@ const engine = new WakabamarkEngine({
 const html = engine.renderHtml('%%secret%% >>123');
 const markdown = engine.renderMarkdown('%%secret%% >>123');
 ```
+
+## Plugins
+
+Plugins are currently inline-only. A `WakabamarkEnginePlugin` may recognize custom syntax in `parseInline()` and return built-in inline nodes such as `text`, `strong`, `link`, or `code-span`.
+
+```ts
+import {
+	WakabamarkEngine,
+	type WakabamarkEnginePlugin,
+} from 'wakabamark';
+
+const mentionPlugin: WakabamarkEnginePlugin = {
+	name: 'mentions',
+	parseInline: ({ input, start }) => {
+		const match = /^@([a-z0-9_]+)/i.exec(input.slice(start));
+		const username = match?.[1];
+		if (!match || username === undefined) {
+			return null;
+		}
+
+		return {
+			nodes: [
+				{
+					type: 'link',
+					href: `/users/${username.toLowerCase()}`,
+					text: `@${username}`,
+					external: false,
+				},
+			],
+			nextIndex: start + match[0].length,
+		};
+	},
+};
+
+const engine = new WakabamarkEngine({
+	plugins: [mentionPlugin],
+});
+```
+
+Current plugin constraints:
+
+- Plugins run after built-in code-span parsing and before other built-in inline rules.
+- Plugins may emit only built-in inline nodes in v1.
+- Plugin-generated links are still checked against the unsafe-scheme denylist.
+- Plugins do not run inside code spans.
 
 ## API
 
@@ -47,6 +93,7 @@ class WakabamarkEngine {
 - `features.postReferences`: enable or disable `>>123` post-reference parsing, disabled by default
 - `features.spoilers`: force-enable or disable `%%spoiler%%`
 - `resolvePostReferenceHref(postId)`: customize the href for `>>123` when post-reference parsing is enabled
+- `plugins`: register `WakabamarkEnginePlugin[]` for custom inline syntax
 - `allowedUrlProtocols`: allowed external protocols, still filtered by an internal unsafe-scheme denylist
 - `html.externalLinkRel`: customize `rel` for external links
 - `html.externalLinkTarget`: customize `target` for external links
@@ -57,6 +104,7 @@ class WakabamarkEngine {
 - Raw HTML from input is escaped, not passed through.
 - HTML and Markdown are rendered from a typed AST, not by direct regex-to-HTML substitution.
 - Dangerous protocols are never linkified, even if they are explicitly listed in `allowedUrlProtocols`.
+- Plugin output is validated before it enters the AST; unsafe hrefs and unsupported node types are rejected.
 - Code spans and indented code blocks bypass further inline formatting.
 
 ## Development

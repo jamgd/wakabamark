@@ -87,6 +87,38 @@ export type WakabamarkFeatureOptions = {
 	spoilers?: boolean;
 };
 
+export type WakabamarkInlinePluginContext = {
+	input: string;
+	start: number;
+	profile: WakabamarkProfile;
+	features: Readonly<{
+		postReferences: boolean;
+		spoilers: boolean;
+	}>;
+	resolvePostReferenceHref: (postId: string) => string;
+};
+
+export type WakabamarkInlinePluginMatch = {
+	nodes: InlineNode[];
+	nextIndex: number;
+};
+
+export type WakabamarkEnginePlugin = {
+	name: string;
+	priority?: number;
+	parseInline: (
+		context: WakabamarkInlinePluginContext,
+	) => WakabamarkInlinePluginMatch | null;
+};
+
+export type ResolvedWakabamarkEnginePlugin = {
+	name: string;
+	priority: number;
+	parseInline: (
+		context: WakabamarkInlinePluginContext,
+	) => WakabamarkInlinePluginMatch | null;
+};
+
 export type WakabamarkHtmlOptions = {
 	externalLinkRel?: string;
 	externalLinkTarget?: string | null;
@@ -98,6 +130,7 @@ export type WakabamarkEngineOptions = {
 	profile?: WakabamarkProfile;
 	features?: WakabamarkFeatureOptions;
 	html?: WakabamarkHtmlOptions;
+	plugins?: readonly WakabamarkEnginePlugin[];
 	resolvePostReferenceHref?: (postId: string) => string;
 };
 
@@ -113,5 +146,6 @@ export type ResolvedWakabamarkEngineOptions = {
 		externalLinkTarget: string | null;
 		spoilerClassName: string;
 	};
+	plugins: readonly ResolvedWakabamarkEnginePlugin[];
 	resolvePostReferenceHref: (postId: string) => string;
 };
