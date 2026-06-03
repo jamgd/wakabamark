@@ -1,4 +1,4 @@
-import { UNSAFE_URL_PROTOCOLS } from './constants.js';
+import { CODE_INDENT_WIDTH, SPOILER_DELIMITER, UNSAFE_URL_PROTOCOLS } from './constants.js';
 import type {
   BlockNode,
   BlockQuoteNode,
@@ -460,7 +460,7 @@ function tryParseCodeBlock(lines: string[], start: number): { node: CodeBlockNod
       break;
     }
 
-    codeLines.push(line.startsWith('\t') ? line.slice(1) : line.slice(4));
+    codeLines.push(line.startsWith('\t') ? line.slice(1) : line.slice(CODE_INDENT_WIDTH));
     index += 1;
   }
 
@@ -699,12 +699,13 @@ function tryParseSpoiler(
   start: number,
   options: Readonly<ResolvedWakabamarkEngineOptions>,
 ): { node: SpoilerNode; nextIndex: number } | null {
-  if (!options.features.spoilers || !input.startsWith('%%', start)) {
+  if (!options.features.spoilers || !input.startsWith(SPOILER_DELIMITER, start)) {
     return null;
   }
 
-  const closingIndex = input.indexOf('%%', start + 2);
-  if (closingIndex === -1 || closingIndex === start + 2) {
+  const contentStart = start + SPOILER_DELIMITER.length;
+  const closingIndex = input.indexOf(SPOILER_DELIMITER, contentStart);
+  if (closingIndex === -1 || closingIndex === contentStart) {
     return null;
   }
 
@@ -714,10 +715,10 @@ function tryParseSpoiler(
       children: [
         {
           type: 'text',
-          value: input.slice(start + 2, closingIndex),
+          value: input.slice(contentStart, closingIndex),
         },
       ],
     },
-    nextIndex: closingIndex + 2,
+    nextIndex: closingIndex + SPOILER_DELIMITER.length,
   };
 }
