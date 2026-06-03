@@ -4,6 +4,8 @@ export const DEFAULT_EXTERNAL_LINK_REL = 'nofollow noopener noreferrer';
 
 export const DEFAULT_EXTERNAL_LINK_TARGET = '_blank';
 
+export const DEFAULT_BLOCKQUOTE_CLASS_NAME = 'wakabamark-blockquote';
+
 export const DEFAULT_SPOILER_CLASS_NAME = 'wakabamark-spoiler';
 
 export const UNSAFE_URL_PROTOCOLS = new Set(['javascript:', 'data:', 'vbscript:', 'file:']);

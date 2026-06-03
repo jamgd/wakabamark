@@ -7,8 +7,8 @@ describe('WakabamarkEngine coverage', () => {
   it('normalizes CRLF and lone CR line endings', () => {
     const engine = new WakabamarkEngine();
 
-    assert.equal(engine.renderHtml('a\r\nb'), '<p>a b</p>');
-    assert.equal(engine.renderHtml('a\rb'), '<p>a b</p>');
+    assert.equal(engine.renderHtml('a\r\nb'), '<p>a<br />b</p>');
+    assert.equal(engine.renderHtml('a\rb'), '<p>a<br />b</p>');
     assert.equal(engine.renderHtml('a\r\n\r\nb'), '<p>a</p><p>b</p>');
   });
 

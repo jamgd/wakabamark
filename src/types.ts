@@ -113,6 +113,7 @@ export type ResolvedWakabamarkEnginePlugin = {
 };
 
 export type WakabamarkHtmlOptions = {
+  blockquoteClassName?: string;
   externalLinkRel?: string;
   externalLinkTarget?: string | null;
   spoilerClassName?: string;
@@ -133,6 +134,7 @@ export type ResolvedWakabamarkEngineOptions = {
     spoilers: boolean;
   };
   html: {
+    blockquoteClassName: string;
     externalLinkRel: string;
     externalLinkTarget: string | null;
     spoilerClassName: string;

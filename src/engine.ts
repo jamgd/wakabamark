@@ -125,7 +125,7 @@ function renderBlockHtml(block: BlockNode, options: Readonly<ResolvedWakabamarkE
       return `<${tag}>${items}</${tag}>`;
     }
     case 'blockquote':
-      return `<blockquote><p>${renderInlineLinesHtml(block.lines, options)}</p></blockquote>`;
+      return `<blockquote class="${escapeHtmlAttribute(options.html.blockquoteClassName)}"><p>${renderBlockQuoteLinesHtml(block.lines, options)}</p></blockquote>`;
     case 'code-block':
       return `<pre><code>${escapeHtml(block.value)}</code></pre>`;
   }
@@ -134,7 +134,7 @@ function renderBlockHtml(block: BlockNode, options: Readonly<ResolvedWakabamarkE
 function renderInlineHtml(node: InlineNode, options: Readonly<ResolvedWakabamarkEngineOptions>): string {
   switch (node.type) {
     case 'text':
-      return escapeHtml(node.value);
+      return renderHtmlTextValue(node.value);
     case 'emphasis':
       return `<em>${node.children.map(renderTextChildHtml).join('')}</em>`;
     case 'strong':
@@ -162,6 +162,51 @@ function renderInlineHtml(node: InlineNode, options: Readonly<ResolvedWakabamark
   }
 }
 
+function renderTextChildHtml(node: TextNode): string {
+  return renderHtmlTextValue(node.value);
+}
+
+function renderTextChildMarkdown(node: TextNode): string {
+  return escapeMarkdownText(node.value);
+}
+
+function renderInlineLinesHtml(lines: InlineNode[][], options: Readonly<ResolvedWakabamarkEngineOptions>): string {
+  return lines.map(line => renderInlineLineHtml(line, options)).join('<br />');
+}
+
+function renderBlockQuoteLinesHtml(lines: InlineNode[][], options: Readonly<ResolvedWakabamarkEngineOptions>): string {
+  return lines.map(line => `&gt;${renderInlineLineHtml(line, options)}`).join('<br />');
+}
+
+function renderInlineLineHtml(line: InlineNode[], options: Readonly<ResolvedWakabamarkEngineOptions>): string {
+  return line.map(node => renderInlineHtml(node, options)).join('');
+}
+
+function renderHtmlTextValue(value: string): string {
+  return escapeHtml(value).replace(/\n/g, '<br />');
+}
+
+function renderInlineLineMarkdown(line: InlineNode[]): string {
+  return line.map(renderInlineMarkdown).join('');
+}
+
+function renderListMarkdown(block: ListNode): string {
+  return block.items
+    .map((item, index) => {
+      const marker = block.ordered ? `${index + 1}. ` : '- ';
+      const continuationPrefix = ' '.repeat(marker.length);
+
+      return item.lines
+        .map((line, lineIndex) => {
+          const prefix = lineIndex === 0 ? marker : continuationPrefix;
+
+          return `${prefix}${renderInlineLineMarkdown(line)}`;
+        })
+        .join('\n');
+    })
+    .join('\n');
+}
+
 function renderBlockMarkdown(block: BlockNode): string {
   switch (block.type) {
     case 'paragraph':
@@ -169,7 +214,7 @@ function renderBlockMarkdown(block: BlockNode): string {
     case 'list':
       return renderListMarkdown(block);
     case 'blockquote':
-      return block.lines.map(line => `> ${renderInlineLineMarkdown(line)}`).join('\n');
+      return block.lines.map(line => `>${renderInlineLineMarkdown(line)}`).join('\n');
     case 'code-block':
       return block.value
         .split('\n')
@@ -199,14 +244,6 @@ function renderInlineMarkdown(node: InlineNode): string {
   }
 }
 
-function renderTextChildHtml(node: TextNode): string {
-  return escapeHtml(node.value);
-}
-
-function renderTextChildMarkdown(node: TextNode): string {
-  return escapeMarkdownText(node.value);
-}
-
 function extractInlinePlainText(node: InlineNode): string {
   switch (node.type) {
     case 'text':
@@ -233,39 +270,16 @@ function extractBlockPlainText(block: BlockNode): string {
         .map(item => item.lines.map(line => line.map(extractInlinePlainText).join('')).join('\n'))
         .join('\n');
     case 'blockquote':
-      return block.lines.map(line => line.map(extractInlinePlainText).join('')).join('\n');
+      return block.lines.map(extractBlockQuoteLinePlainText).join('\n');
     case 'code-block':
       return block.value;
   }
 }
 
-function renderInlineLinesHtml(lines: InlineNode[][], options: Readonly<ResolvedWakabamarkEngineOptions>): string {
-  return lines.map(line => renderInlineLineHtml(line, options)).join('<br />');
-}
+function extractBlockQuoteLinePlainText(line: InlineNode[]): string {
+  const value = line.map(extractInlinePlainText).join('');
 
-function renderInlineLineHtml(line: InlineNode[], options: Readonly<ResolvedWakabamarkEngineOptions>): string {
-  return line.map(node => renderInlineHtml(node, options)).join('');
-}
-
-function renderInlineLineMarkdown(line: InlineNode[]): string {
-  return line.map(renderInlineMarkdown).join('');
-}
-
-function renderListMarkdown(block: ListNode): string {
-  return block.items
-    .map((item, index) => {
-      const marker = block.ordered ? `${index + 1}. ` : '- ';
-      const continuationPrefix = ' '.repeat(marker.length);
-
-      return item.lines
-        .map((line, lineIndex) => {
-          const prefix = lineIndex === 0 ? marker : continuationPrefix;
-
-          return `${prefix}${renderInlineLineMarkdown(line)}`;
-        })
-        .join('\n');
-    })
-    .join('\n');
+  return value.startsWith(' ') ? value.slice(1) : value;
 }
 
 function parseInline(input: string, options: Readonly<ResolvedWakabamarkEngineOptions>): InlineNode[] {
@@ -395,7 +409,7 @@ function tryParseParagraph(
   return {
     node: {
       type: 'paragraph',
-      children: parseInline(paragraphLines.join(' '), options),
+      children: parseInline(paragraphLines.join('\n'), options),
     },
     nextIndex: index,
   };
@@ -420,7 +434,7 @@ function tryParseBlockQuote(
       break;
     }
 
-    quoteLines.push(parseInline(line.replace(/^>\s?/, ''), options));
+    quoteLines.push(parseInline(line.slice(1), options));
     index += 1;
   }
 
@@ -559,7 +573,7 @@ function tryParsePostReference(
   start: number,
   options: Readonly<ResolvedWakabamarkEngineOptions>,
 ): { node: PostReferenceNode; nextIndex: number } | null {
-  if (!input.startsWith('>>', start)) {
+  if (!input.startsWith('>>', start) || input[start - 1] === '>' || input[start + 2] === '>') {
     return null;
   }
 

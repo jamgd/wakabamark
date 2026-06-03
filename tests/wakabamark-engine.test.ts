@@ -52,7 +52,7 @@ describe('WakabamarkEngine', () => {
 
     assert.equal(
       engine.renderHtml(input),
-      '<ul><li>first</li><li>second</li></ul><ol><li>one</li><li>two</li></ol><blockquote><p>quoted</p></blockquote><pre><code>const answer = 42;\nconsole.log(answer);</code></pre>',
+      '<ul><li>first</li><li>second</li></ul><ol><li>one</li><li>two</li></ol><blockquote class="wakabamark-blockquote"><p>&gt; quoted</p></blockquote><pre><code>const answer = 42;\nconsole.log(answer);</code></pre>',
     );
     assert.equal(
       engine.renderMarkdown(input),
@@ -74,8 +74,36 @@ describe('WakabamarkEngine', () => {
   it('supports blockquotes without a space after the marker', () => {
     const engine = new WakabamarkEngine();
 
-    assert.equal(engine.renderHtml('>quoted'), '<blockquote><p>quoted</p></blockquote>');
-    assert.equal(engine.renderMarkdown('>quoted'), '> quoted');
+    assert.equal(
+      engine.renderHtml('>quoted'),
+      '<blockquote class="wakabamark-blockquote"><p>&gt;quoted</p></blockquote>',
+    );
+    assert.equal(engine.renderMarkdown('>quoted'), '>quoted');
+  });
+
+  it('preserves blockquote spacing after the opening marker', () => {
+    const engine = new WakabamarkEngine();
+
+    assert.equal(
+      engine.renderHtml('> quote'),
+      '<blockquote class="wakabamark-blockquote"><p>&gt; quote</p></blockquote>',
+    );
+    assert.equal(engine.renderMarkdown('> quote'), '> quote');
+    assert.equal(
+      engine.renderHtml('>quote'),
+      '<blockquote class="wakabamark-blockquote"><p>&gt;quote</p></blockquote>',
+    );
+    assert.equal(engine.renderMarkdown('>quote'), '>quote');
+  });
+
+  it('supports custom blockquote class names', () => {
+    const engine = new WakabamarkEngine({
+      html: {
+        blockquoteClassName: 'chan-quote',
+      },
+    });
+
+    assert.equal(engine.renderHtml('> quoted'), '<blockquote class="chan-quote"><p>&gt; quoted</p></blockquote>');
   });
 
   it('splits paragraphs on blank lines', () => {
@@ -86,6 +114,15 @@ describe('WakabamarkEngine', () => {
       '<p>First paragraph</p><p>Second paragraph</p>',
     );
     assert.equal(engine.renderMarkdown('First paragraph\n\nSecond paragraph'), 'First paragraph\n\nSecond paragraph');
+  });
+
+  it('preserves line breaks inside a paragraph', () => {
+    const engine = new WakabamarkEngine();
+    const input = 'just text\njust text\njust text';
+
+    assert.equal(engine.renderHtml(input), '<p>just text<br />just text<br />just text</p>');
+    assert.equal(engine.renderMarkdown(input), 'just text\njust text\njust text');
+    assert.equal(engine.extractPlainText(input), 'just text\njust text\njust text');
   });
 
   it('keeps spoilers disabled by default', () => {
@@ -124,6 +161,23 @@ describe('WakabamarkEngine', () => {
       '<p>See <a href="/thread/42#reply-123" data-post-ref="123">&gt;&gt;123</a>.</p>',
     );
     assert.equal(engine.renderMarkdown('See >>123.'), 'See [>>123](/thread/42#reply-123).');
+    assert.equal(
+      engine.renderHtml('>>123'),
+      '<p><a href="/thread/42#reply-123" data-post-ref="123">&gt;&gt;123</a></p>',
+    );
+    assert.equal(engine.renderMarkdown('>>123'), '[>>123](/thread/42#reply-123)');
+  });
+
+  it('matches post references only when exactly two opening angle brackets are present', () => {
+    const engine = new WakabamarkEngine({
+      features: {
+        postReferences: true,
+      },
+      resolvePostReferenceHref: postId => `/thread/42#reply-${postId}`,
+    });
+
+    assert.equal(engine.renderHtml('>>>123'), '<p>&gt;&gt;&gt;123</p>');
+    assert.equal(engine.renderMarkdown('>>>123'), '>>>123');
   });
 
   it('emits a bracketed Markdown link when an autolink URL contains ">"', () => {

@@ -143,9 +143,8 @@ describe('WakabamarkEngine security and edge cases', () => {
       resolvePostReferenceHref: () => 'javascript:alert(1)',
     });
 
-    // ">>123" must sit inline (leading ">>" at column 0 is parsed as a blockquote instead).
-    assert.equal(engine.renderHtml('See >>123'), '<p>See &gt;&gt;123</p>');
-    assert.equal(engine.renderMarkdown('See >>123'), 'See >>123');
+    assert.equal(engine.renderHtml('>>123'), '<p>&gt;&gt;123</p>');
+    assert.equal(engine.renderMarkdown('>>123'), '>>123');
   });
 
   it('does not run inline plugins inside code spans', () => {

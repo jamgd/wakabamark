@@ -4,6 +4,7 @@ Embeddable [WakabaMark](https://wakaba.c3.cx/docs/docs.html#WakabaMark) engine w
 
 - Official-style inline syntax: emphasis, strong, code spans, autolinks, optional post references
 - Official-style block syntax: paragraphs, unordered lists, ordered lists, blockquotes, indented code blocks
+- Single newlines inside a paragraph are preserved as line breaks in HTML output
 - Markdown output from the same AST as HTML output
 - Opt-in spoiler support
 - Inline plugin support through `WakabamarkEnginePlugin`
@@ -93,6 +94,7 @@ class WakabamarkEngine {
 - `allowedUrlProtocols`: allowed external protocols, still filtered by an internal unsafe-scheme denylist
 - `html.externalLinkRel`: customize `rel` for external links
 - `html.externalLinkTarget`: customize `target` for external links
+- `html.blockquoteClassName`: customize the blockquote class name in HTML output
 - `html.spoilerClassName`: customize the spoiler class name in HTML output
 
 ## Security model

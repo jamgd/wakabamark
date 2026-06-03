@@ -1,5 +1,6 @@
 import {
   DEFAULT_ALLOWED_URL_PROTOCOLS,
+  DEFAULT_BLOCKQUOTE_CLASS_NAME,
   DEFAULT_EXTERNAL_LINK_REL,
   DEFAULT_EXTERNAL_LINK_TARGET,
   DEFAULT_SPOILER_CLASS_NAME,
@@ -36,7 +37,7 @@ export function isOrderedListStartLine(line: string): boolean {
 }
 
 export function isBlockQuoteLine(line: string): boolean {
-  return /^>\s?/.test(line);
+  return line.startsWith('>') && line[1] !== '>';
 }
 
 export function isBlockOpeningLine(line: string): boolean {
@@ -80,6 +81,7 @@ export function resolveWakabamarkEngineOptions(options: WakabamarkEngineOptions 
       spoilers: options.features?.spoilers ?? false,
     },
     html: {
+      blockquoteClassName: options.html?.blockquoteClassName ?? DEFAULT_BLOCKQUOTE_CLASS_NAME,
       externalLinkRel: options.html?.externalLinkRel ?? DEFAULT_EXTERNAL_LINK_REL,
       externalLinkTarget: options.html?.externalLinkTarget ?? DEFAULT_EXTERNAL_LINK_TARGET,
       spoilerClassName: options.html?.spoilerClassName ?? DEFAULT_SPOILER_CLASS_NAME,
