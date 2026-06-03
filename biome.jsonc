@@ -1,0 +1,72 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "root": true,
+
+  "files": {
+    "ignoreUnknown": true,
+    "maxSize": 5242880, // 5 MB
+    "includes": ["**/*.{js,ts,json,jsonc}", "!!**/dist", "!!**/.turbo", "!!.idea", "!!.claude"]
+  },
+
+  "formatter": {
+    "enabled": true,
+    "useEditorconfig": true,
+    "lineWidth": 120,
+    "bracketSameLine": false,
+    "bracketSpacing": true
+  },
+
+  "linter": {
+    "enabled": true,
+    "includes": ["**"]
+  },
+
+  "assist": {
+    "enabled": true,
+    "includes": ["**"],
+    "actions": {
+      "source": {
+        "useSortedKeys": "off",
+        "organizeImports": {
+          "level": "on",
+          "options": {
+            "groups": [
+              ":NODE:",
+              ":BLANK_LINE:",
+              [":PACKAGE:"],
+              ":BLANK_LINE:",
+              ":ALIAS:",
+              ":BLANK_LINE:",
+              ["..", "../**"],
+              ":BLANK_LINE:",
+              [".", "./**"]
+            ]
+          }
+        }
+      }
+    }
+  },
+
+  "javascript": {
+    "jsxRuntime": "transparent",
+    "formatter": {
+      "arrowParentheses": "asNeeded",
+      "quoteStyle": "single",
+      "quoteProperties": "asNeeded",
+      "jsxQuoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    }
+  },
+
+  "overrides": [
+    {
+      "includes": ["**/*.test.ts"],
+      "linter": {
+        "domains": {
+          "test": "all"
+        }
+      }
+    }
+  ]
+}

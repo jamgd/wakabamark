@@ -19,10 +19,13 @@
   ],
   "scripts": {
     "build": "rm -rf dist && tsc --build",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --project tsconfig.tests.json --noEmit",
+    "lint": "biome check",
+    "lint:fix": "biome check --fix",
     "test": "node --import tsx --test ./tests/*.test.ts"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.4.16",
     "@types/node": "24.12.4",
     "tsx": "4.22.4",
     "typescript": "6.0.3"

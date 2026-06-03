@@ -14,3 +14,12 @@ node_modules
 
 # artifacts
 dist
+
+# AI
+AGENTS.local.md
+CLAUDE.local.md
+.claude/*.local.*
+
+# IDE
+.idea
+.vscode

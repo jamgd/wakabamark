@@ -1,329 +1,304 @@
 import {
-	DEFAULT_ALLOWED_URL_PROTOCOLS,
-	DEFAULT_EXTERNAL_LINK_REL,
-	DEFAULT_EXTERNAL_LINK_TARGET,
-	DEFAULT_SPOILER_CLASS_NAME,
-	UNSAFE_URL_PROTOCOLS,
+  DEFAULT_ALLOWED_URL_PROTOCOLS,
+  DEFAULT_EXTERNAL_LINK_REL,
+  DEFAULT_EXTERNAL_LINK_TARGET,
+  DEFAULT_SPOILER_CLASS_NAME,
+  UNSAFE_URL_PROTOCOLS,
 } from './constants.js';
-
 import type {
-	InlineNode,
-	ResolvedWakabamarkEngineOptions,
-	ResolvedWakabamarkEnginePlugin,
-	TextNode,
-	WakabamarkEngineOptions,
-	WakabamarkEnginePlugin,
-	WakabamarkInlinePluginMatch,
+  InlineNode,
+  ResolvedWakabamarkEngineOptions,
+  ResolvedWakabamarkEnginePlugin,
+  TextNode,
+  WakabamarkEngineOptions,
+  WakabamarkEnginePlugin,
+  WakabamarkInlinePluginMatch,
 } from './types.js';
 
 export function normalizeInput(input: string): string {
-	return input.replace(/\r\n?/g, '\n');
+  return input.replace(/\r\n?/g, '\n');
 }
 
 export function isBlankLine(line: string | undefined): boolean {
-	return line === undefined || line.trim() === '';
+  return line === undefined || line.trim() === '';
 }
 
 export function isIndentedCodeLine(line: string): boolean {
-	return line.startsWith('\t') || line.startsWith('    ');
+  return line.startsWith('\t') || line.startsWith('    ');
 }
 
 export function isUnorderedListLine(line: string): boolean {
-	return /^[*+-]\s+/.test(line);
+  return /^[*+-]\s+/.test(line);
 }
 
 export function isOrderedListStartLine(line: string): boolean {
-	return /^1\.\s+/.test(line);
+  return /^1\.\s+/.test(line);
 }
 
 export function isBlockQuoteLine(line: string): boolean {
-	return /^>\s?/.test(line);
+  return /^>\s?/.test(line);
 }
 
 export function isBlockOpeningLine(line: string): boolean {
-	return (
-		isIndentedCodeLine(line) ||
-		isUnorderedListLine(line) ||
-		isOrderedListStartLine(line) ||
-		isBlockQuoteLine(line)
-	);
+  return (
+    isIndentedCodeLine(line) || isUnorderedListLine(line) || isOrderedListStartLine(line) || isBlockQuoteLine(line)
+  );
 }
 
-export function pushPendingText(
-	nodes: InlineNode[],
-	input: string,
-	start: number,
-	end: number,
-): void {
-	if (start >= end) {
-		return;
-	}
+export function pushPendingText(nodes: InlineNode[], input: string, start: number, end: number): void {
+  if (start >= end) {
+    return;
+  }
 
-	nodes.push({
-		type: 'text',
-		value: input.slice(start, end),
-	});
+  nodes.push({
+    type: 'text',
+    value: input.slice(start, end),
+  });
 }
 
 export function mergeAdjacentTextNodes(nodes: InlineNode[]): InlineNode[] {
-	const merged: InlineNode[] = [];
+  const merged: InlineNode[] = [];
 
-	for (const node of nodes) {
-		const previous = merged.at(-1);
-		if (previous?.type === 'text' && node.type === 'text') {
-			previous.value += node.value;
-			continue;
-		}
+  for (const node of nodes) {
+    const previous = merged.at(-1);
+    if (previous?.type === 'text' && node.type === 'text') {
+      previous.value += node.value;
+      continue;
+    }
 
-		merged.push(node);
-	}
+    merged.push(node);
+  }
 
-	return merged;
+  return merged;
 }
 
-export function resolveWakabamarkEngineOptions(
-	options: WakabamarkEngineOptions = {},
-): ResolvedWakabamarkEngineOptions {
-	return {
-		allowedUrlProtocols: options.allowedUrlProtocols ?? [...DEFAULT_ALLOWED_URL_PROTOCOLS],
-		features: {
-			postReferences: options.features?.postReferences ?? false,
-			spoilers: options.features?.spoilers ?? false,
-		},
-		html: {
-			externalLinkRel: options.html?.externalLinkRel ?? DEFAULT_EXTERNAL_LINK_REL,
-			externalLinkTarget: options.html?.externalLinkTarget ?? DEFAULT_EXTERNAL_LINK_TARGET,
-			spoilerClassName: options.html?.spoilerClassName ?? DEFAULT_SPOILER_CLASS_NAME,
-		},
-		plugins: resolveWakabamarkEnginePlugins(options.plugins),
-		resolvePostReferenceHref:
-			options.resolvePostReferenceHref ?? (postId => `#post-${postId}`),
-	};
+export function resolveWakabamarkEngineOptions(options: WakabamarkEngineOptions = {}): ResolvedWakabamarkEngineOptions {
+  return {
+    allowedUrlProtocols: options.allowedUrlProtocols ?? [...DEFAULT_ALLOWED_URL_PROTOCOLS],
+    features: {
+      postReferences: options.features?.postReferences ?? false,
+      spoilers: options.features?.spoilers ?? false,
+    },
+    html: {
+      externalLinkRel: options.html?.externalLinkRel ?? DEFAULT_EXTERNAL_LINK_REL,
+      externalLinkTarget: options.html?.externalLinkTarget ?? DEFAULT_EXTERNAL_LINK_TARGET,
+      spoilerClassName: options.html?.spoilerClassName ?? DEFAULT_SPOILER_CLASS_NAME,
+    },
+    plugins: resolveWakabamarkEnginePlugins(options.plugins),
+    resolvePostReferenceHref: options.resolvePostReferenceHref ?? (postId => `#post-${postId}`),
+  };
 }
 
 function resolveWakabamarkEnginePlugins(
-	plugins: readonly WakabamarkEnginePlugin[] | undefined,
+  plugins: readonly WakabamarkEnginePlugin[] | undefined,
 ): readonly ResolvedWakabamarkEnginePlugin[] {
-	if (!plugins || plugins.length === 0) {
-		return [];
-	}
+  if (!plugins || plugins.length === 0) {
+    return [];
+  }
 
-	const seenNames = new Set<string>();
-	const resolvedPlugins = plugins.map(plugin => {
-		const name = plugin.name.trim();
-		if (name === '') {
-			throw new Error('Plugin name must not be empty.');
-		}
+  const seenNames = new Set<string>();
+  const resolvedPlugins = plugins.map(plugin => {
+    const name = plugin.name.trim();
+    if (name === '') {
+      throw new Error('Plugin name must not be empty.');
+    }
 
-		if (seenNames.has(name)) {
-			throw new Error(`Plugin names must be unique. Duplicate plugin name "${name}".`);
-		}
-		seenNames.add(name);
+    if (seenNames.has(name)) {
+      throw new Error(`Plugin names must be unique. Duplicate plugin name "${name}".`);
+    }
+    seenNames.add(name);
 
-		const priority = plugin.priority ?? 0;
-		if (!Number.isFinite(priority)) {
-			throw new Error(`Plugin "${name}" has an invalid priority.`);
-		}
+    const priority = plugin.priority ?? 0;
+    if (!Number.isFinite(priority)) {
+      throw new Error(`Plugin "${name}" has an invalid priority.`);
+    }
 
-		return {
-			name,
-			priority,
-			parseInline: plugin.parseInline,
-		};
-	});
+    return {
+      name,
+      priority,
+      parseInline: plugin.parseInline,
+    };
+  });
 
-	resolvedPlugins.sort((left, right) => {
-		const priorityDiff = right.priority - left.priority;
-		if (priorityDiff !== 0) {
-			return priorityDiff;
-		}
+  resolvedPlugins.sort((left, right) => {
+    const priorityDiff = right.priority - left.priority;
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
 
-		return left.name.localeCompare(right.name);
-	});
+    return left.name.localeCompare(right.name);
+  });
 
-	return resolvedPlugins;
+  return resolvedPlugins;
 }
 
 export function assertValidInlinePluginMatch(
-	pluginName: string,
-	match: WakabamarkInlinePluginMatch,
-	start: number,
-	inputLength: number,
-	options: Readonly<ResolvedWakabamarkEngineOptions>,
+  pluginName: string,
+  match: WakabamarkInlinePluginMatch,
+  start: number,
+  inputLength: number,
+  options: Readonly<ResolvedWakabamarkEngineOptions>,
 ): void {
-	if (!Array.isArray(match.nodes)) {
-		throw new Error(`Plugin "${pluginName}" returned an invalid nodes array.`);
-	}
+  if (!Array.isArray(match.nodes)) {
+    throw new Error(`Plugin "${pluginName}" returned an invalid nodes array.`);
+  }
 
-	if (match.nextIndex <= start) {
-		throw new Error(
-			`Plugin "${pluginName}" returned nextIndex ${match.nextIndex}, but it must advance past start ${start}.`,
-		);
-	}
+  if (match.nextIndex <= start) {
+    throw new Error(
+      `Plugin "${pluginName}" returned nextIndex ${match.nextIndex}, but it must advance past start ${start}.`,
+    );
+  }
 
-	if (match.nextIndex > inputLength) {
-		throw new Error(
-			`Plugin "${pluginName}" returned nextIndex ${match.nextIndex}, which is beyond the input length ${inputLength}.`,
-		);
-	}
+  if (match.nextIndex > inputLength) {
+    throw new Error(
+      `Plugin "${pluginName}" returned nextIndex ${match.nextIndex}, which is beyond the input length ${inputLength}.`,
+    );
+  }
 
-	for (const node of match.nodes) {
-		assertValidInlineNode(pluginName, node, options);
-	}
+  for (const node of match.nodes) {
+    assertValidInlineNode(pluginName, node, options);
+  }
 }
 
 function assertValidInlineNode(
-	pluginName: string,
-	node: unknown,
-	options: Readonly<ResolvedWakabamarkEngineOptions>,
+  pluginName: string,
+  node: unknown,
+  options: Readonly<ResolvedWakabamarkEngineOptions>,
 ): void {
-	if (typeof node !== 'object' || node === null || typeof (node as { type?: unknown }).type !== 'string') {
-		throw new Error(`Plugin "${pluginName}" returned an invalid inline node.`);
-	}
+  if (typeof node !== 'object' || node === null || typeof (node as { type?: unknown }).type !== 'string') {
+    throw new Error(`Plugin "${pluginName}" returned an invalid inline node.`);
+  }
 
-	const typedNode = node as { type: string };
+  const typedNode = node as { type: string };
 
-	switch (typedNode.type) {
-		case 'text':
-			if (typeof (node as { value?: unknown }).value !== 'string') {
-				throw new Error(`Plugin "${pluginName}" returned a text node without a string value.`);
-			}
-			return;
-		case 'emphasis':
-		case 'strong':
-		case 'spoiler':
-			assertValidTextChildren(
-				pluginName,
-				(node as { children?: TextNode[] }).children,
-				typedNode.type,
-			);
-			return;
-		case 'code-span':
-			if (typeof (node as { value?: unknown }).value !== 'string') {
-				throw new Error(`Plugin "${pluginName}" returned a code-span node without a string value.`);
-			}
-			return;
-		case 'link':
-			if (
-				typeof (node as { href?: unknown }).href !== 'string' ||
-				typeof (node as { text?: unknown }).text !== 'string' ||
-				typeof (node as { external?: unknown }).external !== 'boolean'
-			) {
-				throw new Error(`Plugin "${pluginName}" returned an invalid link node.`);
-			}
+  switch (typedNode.type) {
+    case 'text':
+      if (typeof (node as { value?: unknown }).value !== 'string') {
+        throw new Error(`Plugin "${pluginName}" returned a text node without a string value.`);
+      }
+      return;
+    case 'emphasis':
+    case 'strong':
+    case 'spoiler':
+      assertValidTextChildren(pluginName, (node as { children?: TextNode[] }).children, typedNode.type);
+      return;
+    case 'code-span':
+      if (typeof (node as { value?: unknown }).value !== 'string') {
+        throw new Error(`Plugin "${pluginName}" returned a code-span node without a string value.`);
+      }
+      return;
+    case 'link':
+      if (
+        typeof (node as { href?: unknown }).href !== 'string' ||
+        typeof (node as { text?: unknown }).text !== 'string' ||
+        typeof (node as { external?: unknown }).external !== 'boolean'
+      ) {
+        throw new Error(`Plugin "${pluginName}" returned an invalid link node.`);
+      }
 
-			if (!isSafePluginHref((node as { href: string }).href, options.allowedUrlProtocols)) {
-				throw new Error(
-					`Plugin "${pluginName}" produced an unsafe href "${(node as { href: string }).href}".`,
-				);
-			}
-			return;
-		case 'post-reference':
-			if (
-				typeof (node as { href?: unknown }).href !== 'string' ||
-				typeof (node as { postId?: unknown }).postId !== 'string'
-			) {
-				throw new Error(`Plugin "${pluginName}" returned an invalid post-reference node.`);
-			}
+      if (!isSafePluginHref((node as { href: string }).href, options.allowedUrlProtocols)) {
+        throw new Error(`Plugin "${pluginName}" produced an unsafe href "${(node as { href: string }).href}".`);
+      }
+      return;
+    case 'post-reference':
+      if (
+        typeof (node as { href?: unknown }).href !== 'string' ||
+        typeof (node as { postId?: unknown }).postId !== 'string'
+      ) {
+        throw new Error(`Plugin "${pluginName}" returned an invalid post-reference node.`);
+      }
 
-			if (!isSafePluginHref((node as { href: string }).href, options.allowedUrlProtocols)) {
-				throw new Error(
-					`Plugin "${pluginName}" produced an unsafe href "${(node as { href: string }).href}".`,
-				);
-			}
-			return;
-	}
+      if (!isSafePluginHref((node as { href: string }).href, options.allowedUrlProtocols)) {
+        throw new Error(`Plugin "${pluginName}" produced an unsafe href "${(node as { href: string }).href}".`);
+      }
+      return;
+  }
 
-	throw new Error(
-		`Plugin "${pluginName}" returned an unsupported inline node type "${typedNode.type}". Plugins may only emit built-in inline nodes in this version.`,
-	);
+  throw new Error(
+    `Plugin "${pluginName}" returned an unsupported inline node type "${typedNode.type}". Plugins may only emit built-in inline nodes in this version.`,
+  );
 }
 
 function assertValidTextChildren(
-	pluginName: string,
-	children: unknown,
-	nodeType: 'emphasis' | 'strong' | 'spoiler',
+  pluginName: string,
+  children: unknown,
+  nodeType: 'emphasis' | 'strong' | 'spoiler',
 ): void {
-	if (!Array.isArray(children)) {
-		throw new Error(`Plugin "${pluginName}" returned a ${nodeType} node without text children.`);
-	}
+  if (!Array.isArray(children)) {
+    throw new Error(`Plugin "${pluginName}" returned a ${nodeType} node without text children.`);
+  }
 
-	for (const child of children) {
-		if (!isTextNode(child)) {
-			throw new Error(
-				`Plugin "${pluginName}" returned a ${nodeType} node with a non-text child.`,
-			);
-		}
-	}
+  for (const child of children) {
+    if (!isTextNode(child)) {
+      throw new Error(`Plugin "${pluginName}" returned a ${nodeType} node with a non-text child.`);
+    }
+  }
 }
 
 function isTextNode(node: unknown): node is TextNode {
-	return (
-		typeof node === 'object' &&
-		node !== null &&
-		(node as { type?: unknown }).type === 'text' &&
-		typeof (node as { value?: unknown }).value === 'string'
-	);
+  return (
+    typeof node === 'object' &&
+    node !== null &&
+    (node as { type?: unknown }).type === 'text' &&
+    typeof (node as { value?: unknown }).value === 'string'
+  );
 }
 
 function isSafePluginHref(href: string, allowedUrlProtocols: readonly string[]): boolean {
-	if (href.trim() !== href || href === '') {
-		return false;
-	}
+  if (href.trim() !== href || href === '') {
+    return false;
+  }
 
-	if (!/^[a-z][a-z0-9+.-]*:/i.test(href)) {
-		return true;
-	}
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(href)) {
+    return true;
+  }
 
-	let parsedUrl: URL;
-	try {
-		parsedUrl = new URL(href);
-	} catch {
-		return false;
-	}
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(href);
+  } catch {
+    return false;
+  }
 
-	if (UNSAFE_URL_PROTOCOLS.has(parsedUrl.protocol)) {
-		return false;
-	}
+  if (UNSAFE_URL_PROTOCOLS.has(parsedUrl.protocol)) {
+    return false;
+  }
 
-	return allowedUrlProtocols.includes(parsedUrl.protocol);
+  return allowedUrlProtocols.includes(parsedUrl.protocol);
 }
 
 export function escapeHtml(value: string): string {
-	return value
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&#39;');
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 export function escapeHtmlAttribute(value: string): string {
-	return escapeHtml(value);
+  return escapeHtml(value);
 }
 
 export function escapeMarkdownText(value: string): string {
-	return value.replace(/[\\`*_\[\]<]/g, match => `\\${match}`);
+  return value.replace(/[\\`*_[\]<]/g, match => `\\${match}`);
 }
 
 export function escapeMarkdownLinkText(value: string): string {
-	return value.replace(/[\\\[\]]/g, match => `\\${match}`);
+  return value.replace(/[\\[\]]/g, match => `\\${match}`);
 }
 
 export function escapeMarkdownLinkDestination(value: string): string {
-	return value.replace(/[()\s]/g, match => encodeURIComponent(match));
+  return value.replace(/[()\s]/g, match => encodeURIComponent(match));
 }
 
 export function renderMarkdownCodeSpan(value: string): string {
-	const maxBacktickRun = Math.max(
-		...Array.from(value.matchAll(/`+/g), match => match[0].length),
-		0,
-	);
-	const fence = '`'.repeat(maxBacktickRun + 1);
+  const maxBacktickRun = Math.max(...Array.from(value.matchAll(/`+/g), match => match[0].length), 0);
+  const fence = '`'.repeat(maxBacktickRun + 1);
 
-	return `${fence}${value}${fence}`;
+  return `${fence}${value}${fence}`;
 }
 
 export function trimTrailingUrlPunctuation(value: string): string {
-	return value.replace(/[),.!?]+$/g, '');
+  return value.replace(/[),.!?]+$/g, '');
 }

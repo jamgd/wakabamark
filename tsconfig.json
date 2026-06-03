@@ -32,9 +32,7 @@
     "isolatedModules": true,
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
-    "skipLibCheck": true,
-
-    "types": ["node"]
+    "skipLibCheck": true
   },
   "include": ["src"]
 }

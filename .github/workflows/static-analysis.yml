@@ -18,6 +18,19 @@ on:
 run-name: Static Analysis (${{ github.head_ref || github.ref_name }})
 
 jobs:
+  lint:
+    runs-on: ubuntu-slim
+
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Biome
+        uses: biomejs/setup-biome@v2
+
+      - name: Run lint
+        run: biome ci --reporter=github
+        
   typecheck:
     runs-on: ubuntu-slim
 
