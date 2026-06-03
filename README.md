@@ -105,6 +105,10 @@ class WakabamarkEngine {
 - Plugin output is validated before it enters the AST; unsafe hrefs and unsupported node types are rejected.
 - Code spans and indented code blocks bypass further inline formatting.
 
+## Markdown round-trip
+
+Markdown output escapes inline constructs, but it does **not** escape line-leading block markers such as `>`, `#`, `|`, `~`, or a leading `-`/`1.`. A downstream CommonMark renderer may therefore reinterpret some text as a blockquote, heading, table, or list. This is a fidelity limitation rather than a security one (HTML is the security boundary); if exact round-tripping matters, render the Markdown only with a renderer whose behavior you control.
+
 ## Development
 
 ```sh
