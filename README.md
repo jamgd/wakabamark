@@ -2,6 +2,10 @@
 
 Embeddable [WakabaMark](https://wakaba.c3.cx/docs/docs.html#WakabaMark) engine with safe HTML and Markdown output.
 
+The demo is available here - https://jamgd.github.io/wakabamark/
+
+## Features
+
 - Official-style inline syntax: emphasis, strong, code spans, autolinks, optional post references
 - Official-style block syntax: paragraphs, unordered lists, ordered lists, blockquotes, indented code blocks
 - Single newlines inside a paragraph are preserved as line breaks in HTML output
@@ -10,17 +14,21 @@ Embeddable [WakabaMark](https://wakaba.c3.cx/docs/docs.html#WakabaMark) engine w
 - Inline plugin support through `WakabamarkEnginePlugin`
 - Hard denylist for unsafe URL schemes such as `javascript:`
 
-## Usage
+## Installation and Usage
+
+```sh
+npm install wakabamark
+```
 
 ```ts
 import { WakabamarkEngine } from 'wakabamark';
 
 const engine = new WakabamarkEngine({
-	features: {
-		postReferences: true,
-		spoilers: true,
-	},
-	resolvePostReferenceHref: postId => `/thread/42#reply-${postId}`,
+  features: {
+    postReferences: true,
+    spoilers: true,
+  },
+  resolvePostReferenceHref: postId => `/thread/42#reply-${postId}`,
 });
 
 const html = engine.renderHtml('%%secret%% >>123');
@@ -33,35 +41,35 @@ Plugins are currently inline-only. A `WakabamarkEnginePlugin` may recognize cust
 
 ```ts
 import {
-	WakabamarkEngine,
-	type WakabamarkEnginePlugin,
+  WakabamarkEngine,
+  type WakabamarkEnginePlugin,
 } from 'wakabamark';
 
 const mentionPlugin: WakabamarkEnginePlugin = {
-	name: 'mentions',
-	parseInline: ({ input, start }) => {
-		const match = /^@([a-z0-9_]+)/i.exec(input.slice(start));
-		const username = match?.[1];
-		if (!match || username === undefined) {
-			return null;
-		}
+  name: 'mentions',
+  parseInline: ({ input, start }) => {
+    const match = /^@([a-z0-9_]+)/i.exec(input.slice(start));
+    const username = match?.[1];
+    if (!match || username === undefined) {
+      return null;
+    }
 
-		return {
-			nodes: [
-				{
-					type: 'link',
-					href: `/users/${username.toLowerCase()}`,
-					text: `@${username}`,
-					external: false,
-				},
-			],
-			nextIndex: start + match[0].length,
-		};
-	},
+    return {
+      nodes: [
+        {
+          type: 'link',
+          href: `/users/${username.toLowerCase()}`,
+          text: `@${username}`,
+          external: false,
+        },
+      ],
+      nextIndex: start + match[0].length,
+    };
+  },
 };
 
 const engine = new WakabamarkEngine({
-	plugins: [mentionPlugin],
+  plugins: [mentionPlugin],
 });
 ```
 
@@ -76,12 +84,12 @@ Current plugin constraints:
 
 ```ts
 class WakabamarkEngine {
-	constructor(options?: WakabamarkEngineOptions);
+  constructor(options?: WakabamarkEngineOptions);
 
-	parse(input: string): WakabamarkAst;
-	renderHtml(input: string | WakabamarkAst): string;
-	renderMarkdown(input: string | WakabamarkAst): string;
-	extractPlainText(input: string | WakabamarkAst): string;
+  parse(input: string): WakabamarkAst;
+  renderHtml(input: string | WakabamarkAst): string;
+  renderMarkdown(input: string | WakabamarkAst): string;
+  extractPlainText(input: string | WakabamarkAst): string;
 }
 ```
 
