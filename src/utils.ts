@@ -244,8 +244,26 @@ function isTextNode(node: unknown): node is TextNode {
   );
 }
 
+function hasControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || code === 0x7f) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function isSafePluginHref(href: string, allowedUrlProtocols: readonly string[]): boolean {
   if (href.trim() !== href || href === '') {
+    return false;
+  }
+
+  // Browsers strip ASCII tab/newline/CR while resolving URLs, so a value such as "java\tscript:"
+  // would re-form "javascript:" once the stripped control char is gone. Reject all C0 controls +
+  // DEL before the scheme test, which would otherwise misclassify these as harmless relative URLs.
+  if (hasControlCharacter(href)) {
     return false;
   }
 

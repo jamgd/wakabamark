@@ -93,6 +93,30 @@ describe('WakabamarkEngine security and edge cases', () => {
     assert.throws(() => engine.renderHtml('@alice'), /unsafe href/i);
   });
 
+  it('rejects plugin hrefs that hide a scheme behind control characters', () => {
+    const controlCharLinkPlugin = (href: string): WakabamarkEnginePlugin => ({
+      name: 'control-char-link',
+      parseInline: ({ input, start }) => {
+        if (!input.startsWith('@alice', start)) {
+          return null;
+        }
+
+        return {
+          nodes: [{ type: 'link', href, text: '@alice', external: false }],
+          nextIndex: start + '@alice'.length,
+        };
+      },
+    });
+
+    // Tab/newline/CR inside the scheme survive escapeHtml but are stripped by the browser during
+    // URL resolution, re-forming "javascript:". The href validator must reject them up front.
+    for (const href of ['java\tscript:alert(1)', 'javascript\n:alert(1)', 'javascript\r:alert(1)']) {
+      const engine = new WakabamarkEngine({ plugins: [controlCharLinkPlugin(href)] });
+
+      assert.throws(() => engine.renderHtml('@alice'), /unsafe href/i);
+    }
+  });
+
   it('does not run inline plugins inside code spans', () => {
     let pluginMatchedInsideCode = false;
 
