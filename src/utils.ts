@@ -317,7 +317,13 @@ export function escapeMarkdownLinkDestination(value: string): string {
 }
 
 export function renderMarkdownCodeSpan(value: string): string {
-  const maxBacktickRun = Math.max(...Array.from(value.matchAll(/`+/g), match => match[0].length), 0);
+  // Fold instead of Math.max(...array): spreading hundreds of thousands of backtick-run lengths can
+  // exceed the engine's argument limit and throw a RangeError.
+  let maxBacktickRun = 0;
+  for (const match of value.matchAll(/`+/g)) {
+    maxBacktickRun = Math.max(maxBacktickRun, match[0].length);
+  }
+
   const fence = '`'.repeat(maxBacktickRun + 1);
 
   return `${fence}${value}${fence}`;
