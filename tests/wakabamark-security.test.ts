@@ -137,6 +137,17 @@ describe('WakabamarkEngine security and edge cases', () => {
     assert.throws(() => engine.renderHtml('@alice'), /unsafe href/i);
   });
 
+  it('falls back to plain text when a post-reference resolver returns an unsafe href', () => {
+    const engine = new WakabamarkEngine({
+      features: { postReferences: true },
+      resolvePostReferenceHref: () => 'javascript:alert(1)',
+    });
+
+    // ">>123" must sit inline (leading ">>" at column 0 is parsed as a blockquote instead).
+    assert.equal(engine.renderHtml('See >>123'), '<p>See &gt;&gt;123</p>');
+    assert.equal(engine.renderMarkdown('See >>123'), 'See >>123');
+  });
+
   it('does not run inline plugins inside code spans', () => {
     let pluginMatchedInsideCode = false;
 

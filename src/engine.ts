@@ -29,6 +29,7 @@ import {
   isBlockQuoteLine,
   isIndentedCodeLine,
   isOrderedListStartLine,
+  isSafePluginHref,
   isUnorderedListLine,
   mergeAdjacentTextNodes,
   normalizeInput,
@@ -583,11 +584,18 @@ function tryParsePostReference(
     return null;
   }
 
+  // The resolver is developer-supplied, so route its href through the same safety check that core
+  // applies to autolinks and plugin output. If it is unsafe, fall back to rendering ">>NNN" as text.
+  const href = options.resolvePostReferenceHref(postId);
+  if (!isSafePluginHref(href, options.allowedUrlProtocols)) {
+    return null;
+  }
+
   return {
     node: {
       type: 'post-reference',
       postId,
-      href: options.resolvePostReferenceHref(postId),
+      href,
     },
     nextIndex: start + match[0].length,
   };

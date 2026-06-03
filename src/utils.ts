@@ -255,7 +255,7 @@ function hasControlCharacter(value: string): boolean {
   return false;
 }
 
-function isSafePluginHref(href: string, allowedUrlProtocols: readonly string[]): boolean {
+export function isSafePluginHref(href: string, allowedUrlProtocols: readonly string[]): boolean {
   if (href.trim() !== href || href === '') {
     return false;
   }
