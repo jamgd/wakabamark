@@ -97,6 +97,8 @@ class WakabamarkEngine {
 
 ## Security model
 
+- **HTML output is the security boundary.** Input is escaped at every render leaf, so the HTML is safe to embed directly.
+- **Markdown output is for storage and round-tripping, not sanitization.** Its safety depends entirely on the downstream renderer, so always render it with a trusted, sanitizing CommonMark renderer before display.
 - Raw HTML from input is escaped, not passed through.
 - HTML and Markdown are rendered from a typed AST, not by direct regex-to-HTML substitution.
 - Dangerous protocols are never linkified, even if they are explicitly listed in `allowedUrlProtocols`.
