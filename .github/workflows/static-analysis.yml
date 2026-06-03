@@ -1,0 +1,38 @@
+name: Static Analysis
+
+on:
+  push:
+    branches:
+      - master
+      - staging
+      - dev
+      - feature/*
+
+  pull_request:
+    branches:
+      - master
+      - staging
+      - dev
+      - feature/*
+
+run-name: Static Analysis (${{ github.head_ref || github.ref_name }})
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-slim
+
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: "package.json"
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn --immutable
+
+      - name: Check types
+        run: yarn typecheck

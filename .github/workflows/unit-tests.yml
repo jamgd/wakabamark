@@ -1,0 +1,38 @@
+name: Unit Tests
+
+on:
+  push:
+    branches:
+      - master
+      - staging
+      - dev
+      - feature/*
+
+  pull_request:
+    branches:
+      - master
+      - staging
+      - dev
+      - feature/*
+
+run-name: Unit Tests (${{ github.head_ref || github.ref_name }})
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-slim
+
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: "package.json"
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn --immutable
+
+      - name: Unit tests
+        run: yarn test
