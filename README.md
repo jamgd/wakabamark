@@ -80,9 +80,6 @@ class WakabamarkEngine {
 	parse(input: string): WakabamarkAst;
 	renderHtml(input: string | WakabamarkAst): string;
 	renderMarkdown(input: string | WakabamarkAst): string;
-	html(input: string): string;
-	markdown(input: string): string;
-	ast(input: string): WakabamarkAst;
 	extractPlainText(input: string | WakabamarkAst): string;
 }
 ```

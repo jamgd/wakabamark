@@ -66,18 +66,6 @@ export class WakabamarkEngine {
     return ast.children.map(renderBlockMarkdown).join('\n\n');
   }
 
-  public html(input: string): string {
-    return this.renderHtml(input);
-  }
-
-  public markdown(input: string): string {
-    return this.renderMarkdown(input);
-  }
-
-  public ast(input: string): WakabamarkAst {
-    return this.parse(input);
-  }
-
   public extractPlainText(input: string | WakabamarkAst): string {
     const ast = typeof input === 'string' ? this.parse(input) : input;
 
