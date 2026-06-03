@@ -1,0 +1,46 @@
+name: Publish
+
+on:
+  release:
+    types: [ released ]
+
+concurrency:
+  group: ci-publish
+  cancel-in-progress: true
+
+jobs:
+  static-analysis:
+    uses: ./.github/workflows/static-analysis.yml
+  
+  unit-tests:
+    uses: ./.github/workflows/unit-tests.yml
+
+  publish:
+    runs-on: ubuntu-slim
+    needs: [ static-analysis, unit-tests ]
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v6
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: "package.json"
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Build project
+        run: yarn build
+
+      - name: Publish
+        run: yarn npm publish --provenance --staged
