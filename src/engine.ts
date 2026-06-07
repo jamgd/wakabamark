@@ -30,7 +30,7 @@ import {
   isIndentedCodeLine,
   isMarkdownAutolinkSafe,
   isOrderedListStartLine,
-  isSafePluginHref,
+  isSafeHref,
   isUnorderedListLine,
   mergeAdjacentTextNodes,
   normalizeInput,
@@ -68,21 +68,169 @@ export class WakabamarkEngine {
 
   public renderHtml(input: string | WakabamarkAst): string {
     const ast = typeof input === 'string' ? this.parse(input) : input;
+    if (typeof input !== 'string') {
+      assertValidWakabamarkAst(ast, this.options);
+    }
 
     return ast.children.map(block => renderBlockHtml(block, this.options)).join('');
   }
 
   public renderMarkdown(input: string | WakabamarkAst): string {
     const ast = typeof input === 'string' ? this.parse(input) : input;
+    if (typeof input !== 'string') {
+      assertValidWakabamarkAst(ast, this.options);
+    }
 
     return ast.children.map(renderBlockMarkdown).join('\n\n');
   }
 
   public extractPlainText(input: string | WakabamarkAst): string {
     const ast = typeof input === 'string' ? this.parse(input) : input;
+    if (typeof input !== 'string') {
+      assertValidWakabamarkAst(ast, this.options);
+    }
 
     return ast.children.map(extractBlockPlainText).join('\n\n');
   }
+}
+
+function assertValidWakabamarkAst(ast: WakabamarkAst, options: Readonly<ResolvedWakabamarkEngineOptions>): void {
+  if (!isObjectWithType(ast, 'document') || !Array.isArray(ast.children)) {
+    throw new Error('Invalid Wakabamark AST document.');
+  }
+
+  for (const block of ast.children) {
+    assertValidBlockNode(block, options);
+  }
+}
+
+function assertValidBlockNode(block: unknown, options: Readonly<ResolvedWakabamarkEngineOptions>): void {
+  if (!isObjectWithStringType(block)) {
+    throw new Error('Invalid Wakabamark AST block node.');
+  }
+
+  switch (block.type) {
+    case 'paragraph':
+      assertValidInlineChildren((block as { children?: unknown }).children, options, 0);
+      return;
+    case 'list':
+      if (
+        typeof (block as { ordered?: unknown }).ordered !== 'boolean' ||
+        !Array.isArray((block as { items?: unknown }).items)
+      ) {
+        throw new Error('Invalid Wakabamark AST list node.');
+      }
+
+      for (const item of (block as unknown as { items: unknown[] }).items) {
+        assertValidListItemNode(item, options);
+      }
+      return;
+    case 'blockquote':
+      assertValidInlineLines((block as { lines?: unknown }).lines, options);
+      return;
+    case 'code-block':
+      if (typeof (block as { value?: unknown }).value !== 'string') {
+        throw new Error('Invalid Wakabamark AST code-block node.');
+      }
+      return;
+  }
+
+  throw new Error(`Unsupported Wakabamark AST block node type "${block.type}".`);
+}
+
+function assertValidListItemNode(item: unknown, options: Readonly<ResolvedWakabamarkEngineOptions>): void {
+  if (!isObjectWithType(item, 'list-item')) {
+    throw new Error('Invalid Wakabamark AST list item node.');
+  }
+
+  assertValidInlineLines((item as { lines?: unknown }).lines, options);
+}
+
+function assertValidInlineLines(lines: unknown, options: Readonly<ResolvedWakabamarkEngineOptions>): void {
+  if (!Array.isArray(lines)) {
+    throw new Error('Invalid Wakabamark AST inline lines.');
+  }
+
+  for (const line of lines) {
+    assertValidInlineChildren(line, options, 0);
+  }
+}
+
+function assertValidInlineChildren(
+  children: unknown,
+  options: Readonly<ResolvedWakabamarkEngineOptions>,
+  depth: number,
+): void {
+  if (!Array.isArray(children)) {
+    throw new Error('Invalid Wakabamark AST inline children.');
+  }
+
+  for (const child of children) {
+    assertValidInlineNode(child, options, depth);
+  }
+}
+
+function assertValidInlineNode(node: unknown, options: Readonly<ResolvedWakabamarkEngineOptions>, depth: number): void {
+  if (!isObjectWithStringType(node)) {
+    throw new Error('Invalid Wakabamark AST inline node.');
+  }
+
+  switch (node.type) {
+    case 'text':
+    case 'code-span':
+      if (typeof (node as { value?: unknown }).value !== 'string') {
+        throw new Error(`Invalid Wakabamark AST ${node.type} node.`);
+      }
+      return;
+    case 'emphasis':
+    case 'strong':
+    case 'underline':
+    case 'strikethrough':
+    case 'spoiler':
+    case 'superscript':
+    case 'subscript':
+      if (depth >= options.maxInlineNestingDepth) {
+        throw new Error('Wakabamark AST exceeds maxInlineNestingDepth.');
+      }
+
+      assertValidInlineChildren((node as { children?: unknown }).children, options, depth + 1);
+      return;
+    case 'link':
+      if (
+        typeof (node as { href?: unknown }).href !== 'string' ||
+        typeof (node as { text?: unknown }).text !== 'string' ||
+        typeof (node as { external?: unknown }).external !== 'boolean'
+      ) {
+        throw new Error('Invalid Wakabamark AST link node.');
+      }
+
+      if (!isSafeHref((node as unknown as { href: string }).href, options.allowedUrlProtocols)) {
+        throw new Error(`Wakabamark AST contains an unsafe href "${(node as unknown as { href: string }).href}".`);
+      }
+      return;
+    case 'post-reference':
+      if (
+        typeof (node as { href?: unknown }).href !== 'string' ||
+        typeof (node as { postId?: unknown }).postId !== 'string'
+      ) {
+        throw new Error('Invalid Wakabamark AST post-reference node.');
+      }
+
+      if (!isSafeHref((node as unknown as { href: string }).href, options.allowedUrlProtocols)) {
+        throw new Error(`Wakabamark AST contains an unsafe href "${(node as unknown as { href: string }).href}".`);
+      }
+      return;
+  }
+
+  throw new Error(`Unsupported Wakabamark AST inline node type "${node.type}".`);
+}
+
+function isObjectWithType(value: unknown, type: string): value is { type: string; children?: unknown } {
+  return isObjectWithStringType(value) && value.type === type;
+}
+
+function isObjectWithStringType(value: unknown): value is { type: string } {
+  return typeof value === 'object' && value !== null && typeof (value as { type?: unknown }).type === 'string';
 }
 
 function parseBlocks(input: string, options: Readonly<ResolvedWakabamarkEngineOptions>): BlockNode[] {
@@ -320,7 +468,7 @@ function extractBlockQuoteLinePlainText(line: InlineNode[]): string {
   return value.startsWith(' ') ? value.slice(1) : value;
 }
 
-function parseInline(input: string, options: Readonly<ResolvedWakabamarkEngineOptions>): InlineNode[] {
+function parseInline(input: string, options: Readonly<ResolvedWakabamarkEngineOptions>, depth = 0): InlineNode[] {
   const nodes: InlineNode[] = [];
   let cursor = 0;
   let textStart = 0;
@@ -364,7 +512,7 @@ function parseInline(input: string, options: Readonly<ResolvedWakabamarkEngineOp
       continue;
     }
 
-    const bbcode = tryParseBbCode(input, cursor, options);
+    const bbcode = tryParseBbCode(input, cursor, options, depth);
     if (bbcode) {
       pushPendingText(nodes, input, textStart, cursor);
       nodes.push(bbcode.node);
@@ -373,7 +521,7 @@ function parseInline(input: string, options: Readonly<ResolvedWakabamarkEngineOp
       continue;
     }
 
-    const strong = tryParseDelimitedText(input, cursor, ['**', '__'], options, 'strong');
+    const strong = tryParseDelimitedText(input, cursor, ['**', '__'], options, 'strong', depth);
     if (strong) {
       pushPendingText(nodes, input, textStart, cursor);
       nodes.push(strong.node);
@@ -382,7 +530,7 @@ function parseInline(input: string, options: Readonly<ResolvedWakabamarkEngineOp
       continue;
     }
 
-    const emphasis = tryParseDelimitedText(input, cursor, ['*', '_'], options, 'emphasis');
+    const emphasis = tryParseDelimitedText(input, cursor, ['*', '_'], options, 'emphasis', depth);
     if (emphasis) {
       pushPendingText(nodes, input, textStart, cursor);
       nodes.push(emphasis.node);
@@ -391,7 +539,7 @@ function parseInline(input: string, options: Readonly<ResolvedWakabamarkEngineOp
       continue;
     }
 
-    const spoiler = tryParseSpoiler(input, cursor, options);
+    const spoiler = tryParseSpoiler(input, cursor, options, depth);
     if (spoiler) {
       pushPendingText(nodes, input, textStart, cursor);
       nodes.push(spoiler.node);
@@ -635,7 +783,7 @@ function tryParsePostReference(
   }
 
   const href = options.resolvePostReferenceHref(postId);
-  if (!isSafePluginHref(href, options.allowedUrlProtocols)) {
+  if (!isSafeHref(href, options.allowedUrlProtocols)) {
     return null;
   }
 
@@ -699,7 +847,12 @@ function tryParseDelimitedText(
   delimiters: readonly string[],
   options: Readonly<ResolvedWakabamarkEngineOptions>,
   type: EmphasisNode['type'] | StrongNode['type'],
+  depth: number,
 ): { node: EmphasisNode | StrongNode; nextIndex: number } | null {
+  if (depth >= options.maxInlineNestingDepth) {
+    return null;
+  }
+
   for (const delimiter of delimiters) {
     if (!input.startsWith(delimiter, start)) {
       continue;
@@ -710,7 +863,7 @@ function tryParseDelimitedText(
       continue;
     }
 
-    const children = parseInline(input.slice(start + delimiter.length, closingIndex), options);
+    const children = parseInline(input.slice(start + delimiter.length, closingIndex), options, depth + 1);
 
     if (type === 'strong') {
       return {
@@ -738,8 +891,13 @@ function tryParseSpoiler(
   input: string,
   start: number,
   options: Readonly<ResolvedWakabamarkEngineOptions>,
+  depth: number,
 ): { node: SpoilerNode; nextIndex: number } | null {
-  if (!options.features.spoilers || !input.startsWith(SPOILER_DELIMITER, start)) {
+  if (
+    !options.features.spoilers ||
+    depth >= options.maxInlineNestingDepth ||
+    !input.startsWith(SPOILER_DELIMITER, start)
+  ) {
     return null;
   }
 
@@ -752,7 +910,7 @@ function tryParseSpoiler(
   return {
     node: {
       type: 'spoiler',
-      children: parseInline(input.slice(contentStart, closingIndex), options),
+      children: parseInline(input.slice(contentStart, closingIndex), options, depth + 1),
     },
     nextIndex: closingIndex + SPOILER_DELIMITER.length,
   };
@@ -762,8 +920,9 @@ function tryParseBbCode(
   input: string,
   start: number,
   options: Readonly<ResolvedWakabamarkEngineOptions>,
+  depth: number,
 ): { node: InlineContainerNode; nextIndex: number } | null {
-  if (!options.features.bbCodes || input[start] !== '[') {
+  if (!options.features.bbCodes || depth >= options.maxInlineNestingDepth || input[start] !== '[') {
     return null;
   }
 
@@ -777,7 +936,7 @@ function tryParseBbCode(
     return null;
   }
 
-  const children = parseInline(input.slice(openingTag.nextIndex, closingIndex), options);
+  const children = parseInline(input.slice(openingTag.nextIndex, closingIndex), options, depth + 1);
 
   return {
     node: {

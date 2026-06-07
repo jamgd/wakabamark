@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { WakabamarkEngine, type WakabamarkEnginePlugin } from '../src/index.ts';
+import { type WakabamarkAst, WakabamarkEngine, type WakabamarkEnginePlugin } from '../src/index.ts';
 
 describe('WakabamarkEngine security and edge cases', () => {
   it('preserves list continuation lines safely', () => {
@@ -137,6 +137,57 @@ describe('WakabamarkEngine security and edge cases', () => {
     assert.throws(() => engine.renderHtml('@alice'), /unsafe href/i);
   });
 
+  it('rejects unsafe hrefs in externally supplied ASTs', () => {
+    const engine = new WakabamarkEngine();
+    const unsafeLinkAst: WakabamarkAst = {
+      type: 'document',
+      children: [
+        {
+          type: 'paragraph',
+          children: [{ type: 'link', href: 'javascript:alert(1)', text: 'x', external: false }],
+        },
+      ],
+    };
+    const unsafePostReferenceAst: WakabamarkAst = {
+      type: 'document',
+      children: [
+        {
+          type: 'paragraph',
+          children: [{ type: 'post-reference', postId: '123', href: 'javascript:alert(1)' }],
+        },
+      ],
+    };
+
+    assert.throws(() => engine.renderHtml(unsafeLinkAst), /unsafe href/i);
+    assert.throws(() => engine.renderMarkdown(unsafeLinkAst), /unsafe href/i);
+    assert.throws(() => engine.renderMarkdown(unsafePostReferenceAst), /unsafe href/i);
+  });
+
+  it('rejects malformed externally supplied AST nodes', () => {
+    const engine = new WakabamarkEngine();
+    const unsupportedNodeAst = {
+      type: 'document',
+      children: [
+        {
+          type: 'paragraph',
+          children: [{ type: 'emoji', value: 'wave' }],
+        },
+      ],
+    } as never;
+    const malformedChildrenAst = {
+      type: 'document',
+      children: [
+        {
+          type: 'paragraph',
+          children: [{ type: 'strong', children: 'x' }],
+        },
+      ],
+    } as never;
+
+    assert.throws(() => engine.renderHtml(unsupportedNodeAst), /unsupported wakabamark ast inline node type/i);
+    assert.throws(() => engine.extractPlainText(malformedChildrenAst), /invalid wakabamark ast inline children/i);
+  });
+
   it('falls back to plain text when a post-reference resolver returns an unsafe href', () => {
     const engine = new WakabamarkEngine({
       features: { postReferences: true },
@@ -216,5 +267,34 @@ describe('WakabamarkEngine security and edge cases', () => {
     // The previous implementation took ~18s at this size; linear parsing finishes in tens of ms.
     // The loose bound avoids CI flakiness while still failing loudly if quadratic behaviour returns.
     assert.ok(elapsedMs < 3000, `expected linear-time parse, took ${elapsedMs.toFixed(0)}ms`);
+  });
+
+  it('does not overflow the stack on deeply nested bbcode', () => {
+    const engine = new WakabamarkEngine({
+      features: {
+        bbCodes: true,
+      },
+    });
+    const input = `${'[B]'.repeat(1_000)}x${'[/B]'.repeat(1_000)}`;
+
+    assert.doesNotThrow(() => engine.renderHtml(input));
+  });
+
+  it('uses maxInlineNestingDepth to cap recursive inline parsing', () => {
+    const engine = new WakabamarkEngine({
+      features: {
+        bbCodes: true,
+      },
+      maxInlineNestingDepth: 1,
+    });
+
+    assert.equal(engine.renderHtml('[B][I]x[/I][/B]'), '<p><strong>[I]x[/I]</strong></p>');
+    assert.equal(engine.renderMarkdown('[B][I]x[/I][/B]'), '**\\[I\\]x\\[/I\\]**');
+  });
+
+  it('rejects invalid maxInlineNestingDepth values during engine construction', () => {
+    for (const maxInlineNestingDepth of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      assert.throws(() => new WakabamarkEngine({ maxInlineNestingDepth }), /non-negative integer/i);
+    }
   });
 });

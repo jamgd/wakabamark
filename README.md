@@ -103,6 +103,7 @@ class WakabamarkEngine {
 - `resolvePostReferenceHref(postId)`: customize the href for `>>123` when post-reference parsing is enabled
 - `plugins`: register `WakabamarkEnginePlugin[]` for custom inline syntax
 - `allowedUrlProtocols`: allowed external protocols, still filtered by an internal unsafe-scheme denylist
+- `maxInlineNestingDepth`: maximum recursive inline formatting depth, defaults to `64`
 - `html.externalLinkRel`: customize `rel` for external links
 - `html.externalLinkTarget`: customize `target` for external links
 - `html.blockquoteClassName`: customize the blockquote class name in HTML output
@@ -115,6 +116,7 @@ class WakabamarkEngine {
 - Raw HTML from input is escaped, not passed through.
 - HTML and Markdown are rendered from a typed AST, not by direct regex-to-HTML substitution.
 - Dangerous protocols are never linkified, even if they are explicitly listed in `allowedUrlProtocols`.
+- Directly supplied ASTs are validated before rendering; unsafe hrefs throw instead of rendering.
 - Plugin output is validated before it enters the AST; unsafe hrefs and unsupported node types are rejected.
 - Code spans and indented code blocks bypass further inline formatting.
 

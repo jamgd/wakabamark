@@ -3,6 +3,7 @@ import {
   DEFAULT_BLOCKQUOTE_CLASS_NAME,
   DEFAULT_EXTERNAL_LINK_REL,
   DEFAULT_EXTERNAL_LINK_TARGET,
+  DEFAULT_MAX_INLINE_NESTING_DEPTH,
   DEFAULT_SPOILER_CLASS_NAME,
   UNSAFE_URL_PROTOCOLS,
 } from './constants.js';
@@ -87,9 +88,22 @@ export function resolveWakabamarkEngineOptions(options: WakabamarkEngineOptions 
       externalLinkTarget: options.html?.externalLinkTarget ?? DEFAULT_EXTERNAL_LINK_TARGET,
       spoilerClassName: options.html?.spoilerClassName ?? DEFAULT_SPOILER_CLASS_NAME,
     },
+    maxInlineNestingDepth: resolveMaxInlineNestingDepth(options.maxInlineNestingDepth),
     plugins: resolveWakabamarkEnginePlugins(options.plugins),
     resolvePostReferenceHref: options.resolvePostReferenceHref ?? (postId => `#post-${postId}`),
   };
+}
+
+function resolveMaxInlineNestingDepth(value: number | undefined): number {
+  if (value === undefined) {
+    return DEFAULT_MAX_INLINE_NESTING_DEPTH;
+  }
+
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error('maxInlineNestingDepth must be a non-negative integer.');
+  }
+
+  return value;
 }
 
 function resolveWakabamarkEnginePlugins(
@@ -203,7 +217,7 @@ function assertValidInlineNode(
         throw new Error(`Plugin "${pluginName}" returned an invalid link node.`);
       }
 
-      if (!isSafePluginHref((node as { href: string }).href, options.allowedUrlProtocols)) {
+      if (!isSafeHref((node as { href: string }).href, options.allowedUrlProtocols)) {
         throw new Error(`Plugin "${pluginName}" produced an unsafe href "${(node as { href: string }).href}".`);
       }
       return;
@@ -215,7 +229,7 @@ function assertValidInlineNode(
         throw new Error(`Plugin "${pluginName}" returned an invalid post-reference node.`);
       }
 
-      if (!isSafePluginHref((node as { href: string }).href, options.allowedUrlProtocols)) {
+      if (!isSafeHref((node as { href: string }).href, options.allowedUrlProtocols)) {
         throw new Error(`Plugin "${pluginName}" produced an unsafe href "${(node as { href: string }).href}".`);
       }
       return;
@@ -252,7 +266,7 @@ function hasControlCharacter(value: string): boolean {
   return false;
 }
 
-export function isSafePluginHref(href: string, allowedUrlProtocols: readonly string[]): boolean {
+export function isSafeHref(href: string, allowedUrlProtocols: readonly string[]): boolean {
   if (href.trim() !== href || href === '') {
     return false;
   }

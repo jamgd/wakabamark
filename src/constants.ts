@@ -15,3 +15,5 @@ export const CODE_INDENT_WIDTH = 4;
 
 // Delimiter that opens and closes an inline spoiler span.
 export const SPOILER_DELIMITER = '%%';
+
+export const DEFAULT_MAX_INLINE_NESTING_DEPTH = 64;

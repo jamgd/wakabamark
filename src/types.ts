@@ -158,6 +158,7 @@ export type WakabamarkEngineOptions = {
   allowedUrlProtocols?: string[];
   features?: WakabamarkFeatureOptions;
   html?: WakabamarkHtmlOptions;
+  maxInlineNestingDepth?: number;
   plugins?: readonly WakabamarkEnginePlugin[];
   resolvePostReferenceHref?: (postId: string) => string;
 };
@@ -175,6 +176,7 @@ export type ResolvedWakabamarkEngineOptions = {
     externalLinkTarget: string | null;
     spoilerClassName: string;
   };
+  maxInlineNestingDepth: number;
   plugins: readonly ResolvedWakabamarkEnginePlugin[];
   resolvePostReferenceHref: (postId: string) => string;
 };
