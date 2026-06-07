@@ -11,11 +11,18 @@
 - `yarn test` — run unit tests through native `node --test` with runtime transpilation via `tsx`.
 - `yarn typecheck` — strict TS validation.
 - `yarn build` — clears `dist/` and rebuilds with `tsc --build`.
+- `yarn build:demo` — rebuild the browser demo into `demo/dist/` with esbuild.
 
 ## Non-obvious constraints
 
 - TS runs in `module: nodenext`; keep `.js` extensions in TS import/export specifiers.
 - `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` are enabled; parser code must narrow array and regex access explicitly.
+
+## Demo app
+
+- Built files live in `demo/dist/`; `yarn build:demo` removes and recreates that folder.
+- Keep demo code browser-only. Do not introduce Node-only APIs or imports there.
+- `yarn typecheck` includes `tsconfig.demo.json`; demo type errors fail static analysis CI.
 
 ## Parser invariants
 
