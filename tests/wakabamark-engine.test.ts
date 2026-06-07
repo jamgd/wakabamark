@@ -145,7 +145,10 @@ describe('WakabamarkEngine', () => {
       engine.renderHtml('%%secret%% >>123'),
       '<p><span class="wakabamark-spoiler">secret</span> <a href="/thread/42#reply-123" data-post-ref="123">&gt;&gt;123</a></p>',
     );
-    assert.equal(engine.renderMarkdown('%%secret%% >>123'), '>!secret!< [>>123](/thread/42#reply-123)');
+    assert.equal(
+      engine.renderMarkdown('%%secret%% >>123'),
+      '<span class="wakabamark-spoiler">secret</span> [>>123](/thread/42#reply-123)',
+    );
   });
 
   it('allows enabling post-reference parsing explicitly', () => {
@@ -180,13 +183,132 @@ describe('WakabamarkEngine', () => {
     assert.equal(engine.renderMarkdown('>>>123'), '>>>123');
   });
 
+  it('leaves bbcode disabled by default', () => {
+    const engine = new WakabamarkEngine();
+    const input = '[B]bold[/B] [spoiler]secret[/spoiler]';
+
+    assert.equal(engine.renderHtml(input), '<p>[B]bold[/B] [spoiler]secret[/spoiler]</p>');
+    assert.equal(engine.renderMarkdown(input), '\\[B\\]bold\\[/B\\] \\[spoiler\\]secret\\[/spoiler\\]');
+  });
+
+  it('renders supported BBCodes when the feature flag is enabled', () => {
+    const engine = new WakabamarkEngine({
+      features: {
+        bbCodes: true,
+      },
+    });
+
+    const input =
+      '[B]bold[/B] [I]italic[/I] [U]under[/U] [S]strike[/S] [SPOILER]secret[/SPOILER] [SUP]up[/SUP] [SUB]down[/SUB]';
+
+    assert.equal(
+      engine.renderHtml(input),
+      '<p><strong>bold</strong> <em>italic</em> <u>under</u> <s>strike</s> <span class="wakabamark-spoiler">secret</span> <sup>up</sup> <sub>down</sub></p>',
+    );
+    assert.equal(
+      engine.renderMarkdown(input),
+      '**bold** *italic* <u>under</u> <s>strike</s> <span class="wakabamark-spoiler">secret</span> <sup>up</sup> <sub>down</sub>',
+    );
+  });
+
+  it('supports mixed-case bbcode tags and nested inline content', () => {
+    const engine = new WakabamarkEngine({
+      features: {
+        bbCodes: true,
+        postReferences: true,
+      },
+      resolvePostReferenceHref: postId => `/thread/42#reply-${postId}`,
+    });
+
+    const input = '[b][I]mix[/i] https://example.com >>123[/B]';
+
+    assert.equal(
+      engine.renderHtml(input),
+      '<p><strong><em>mix</em> <a href="https://example.com" rel="nofollow noopener noreferrer" target="_blank">https://example.com</a> <a href="/thread/42#reply-123" data-post-ref="123">&gt;&gt;123</a></strong></p>',
+    );
+    assert.equal(engine.renderMarkdown(input), '***mix* <https://example.com> [>>123](/thread/42#reply-123)**');
+    assert.equal(engine.extractPlainText(input), 'mix https://example.com >>123');
+  });
+
+  it('parses classic inline markup nested inside bbcode containers', () => {
+    const engine = new WakabamarkEngine({
+      features: {
+        bbCodes: true,
+        spoilers: true,
+      },
+    });
+
+    assert.equal(engine.renderHtml('[B]*x*[/B]'), '<p><strong><em>x</em></strong></p>');
+    assert.equal(engine.renderMarkdown('[B]*x*[/B]'), '***x***');
+    assert.equal(
+      engine.renderHtml('[SPOILER]**x**[/SPOILER] [B]%%x%%[/B]'),
+      '<p><span class="wakabamark-spoiler"><strong>x</strong></span> <strong><span class="wakabamark-spoiler">x</span></strong></p>',
+    );
+    assert.equal(
+      engine.renderMarkdown('[SPOILER]**x**[/SPOILER] [B]%%x%%[/B]'),
+      '<span class="wakabamark-spoiler">**x**</span> **<span class="wakabamark-spoiler">x</span>**',
+    );
+  });
+
+  it('parses bbcode nested inside classic inline delimiters', () => {
+    const engine = new WakabamarkEngine({
+      features: {
+        bbCodes: true,
+        spoilers: true,
+      },
+    });
+
+    assert.equal(engine.renderHtml('*[B]x[/B]*'), '<p><em><strong>x</strong></em></p>');
+    assert.equal(engine.renderMarkdown('*[B]x[/B]*'), '***x***');
+    assert.equal(
+      engine.renderHtml('%%[B]x[/B]%%'),
+      '<p><span class="wakabamark-spoiler"><strong>x</strong></span></p>',
+    );
+    assert.equal(engine.renderMarkdown('%%[B]x[/B]%%'), '<span class="wakabamark-spoiler">**x**</span>');
+    assert.equal(engine.renderHtml('**[I]x[/I]**'), '<p><strong><em>x</em></strong></p>');
+    assert.equal(engine.renderMarkdown('**[I]x[/I]**'), '***x***');
+  });
+
+  it('does not parse bbcode inside code spans and leaves malformed tags as text', () => {
+    const engine = new WakabamarkEngine({
+      features: {
+        bbCodes: true,
+      },
+    });
+
+    assert.equal(
+      engine.renderHtml('`[B]literal[/B]` [B]open [I]broken[/B] [I][text/I]'),
+      '<p><code>[B]literal[/B]</code> <strong>open [I]broken</strong> [I][text/I]</p>',
+    );
+    assert.equal(
+      engine.renderMarkdown('`[B]literal[/B]` [B]open [I]broken[/B] [I][text/I]'),
+      '`[B]literal[/B]` **open \\[I\\]broken** \\[I\\]\\[text/I\\]',
+    );
+  });
+
+  it('keeps classic spoilers working alongside bbcode spoilers', () => {
+    const engine = new WakabamarkEngine({
+      features: {
+        spoilers: true,
+        bbCodes: true,
+      },
+    });
+
+    assert.equal(
+      engine.renderHtml('%%old%% [spoiler]new[/SPOILER]'),
+      '<p><span class="wakabamark-spoiler">old</span> <span class="wakabamark-spoiler">new</span></p>',
+    );
+    assert.equal(
+      engine.renderMarkdown('%%old%% [spoiler]new[/SPOILER]'),
+      '<span class="wakabamark-spoiler">old</span> <span class="wakabamark-spoiler">new</span>',
+    );
+  });
+
   it('emits a bracketed Markdown link when an autolink URL contains ">"', () => {
     const engine = new WakabamarkEngine();
     const input = 'https://example.com/a>b';
 
-    // The <...> autolink form would terminate at the first ">", corrupting the round-trip.
     assert.equal(engine.renderMarkdown(input), '[https://example.com/a>b](https://example.com/a>b)');
-    // HTML output escapes ">" in the attribute, so it stays a single anchor.
     assert.equal(
       engine.renderHtml(input),
       '<p><a href="https://example.com/a&gt;b" rel="nofollow noopener noreferrer" target="_blank">https://example.com/a&gt;b</a></p>',
@@ -196,15 +318,12 @@ describe('WakabamarkEngine', () => {
   it('widens the Markdown code-span fence past the longest internal backtick run', () => {
     const engine = new WakabamarkEngine();
 
-    // Opening with four backticks captures "x```y"; the fence must grow to four to stay balanced.
     assert.equal(engine.renderHtml('````x```y````'), '<p><code>x```y</code></p>');
     assert.equal(engine.renderMarkdown('````x```y````'), '````x```y````');
   });
 
   it('renders code spans with very many backtick groups without throwing', () => {
     const engine = new WakabamarkEngine();
-    // Single backticks separated by "a" produce one regex match each; the old Math.max(...array)
-    // spread could exceed the engine's argument limit and throw for this many groups.
     const input = `\`\`a${'`a'.repeat(200_000)}\`\``;
 
     assert.doesNotThrow(() => engine.renderMarkdown(input));

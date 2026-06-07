@@ -26,7 +26,17 @@
 - Code spans and indented code blocks must suppress further inline formatting.
 - `features.postReferences` is opt-in.
 - `features.spoilers` is opt-in.
+- `features.bbCodes` is opt-in.
+- Supported BBCode tags are `[B]`, `[I]`, `[U]`, `[S]`, `[SPOILER]`, `[SUP]`, and `[SUB]`.
+- BBCode tags are case-insensitive and support mixed-case opening and closing tags.
+- Mixed nesting is supported in both directions between classic inline syntax and BBCode.
+- Markdown renders spoilers as raw HTML `<span class="wakabamark-spoiler">...</span>`.
+- Markdown also renders underline, strikethrough, superscript, and subscript as raw HTML tags.
+- `%%spoiler%%` and `[SPOILER]...[/SPOILER]` share the same spoiler node/rendering.
+- Malformed or unclosed BBCode must fall back to literal text.
+- `[I][text/I]` is invalid syntax and must not be treated as a compatibility form.
 - `WakabamarkEnginePlugin` is inline-only in v1 and may emit only built-in inline nodes.
+- Plugin-built inline container nodes may contain nested built-in inline nodes.
 - Core, not plugins, owns escaping and href safety checks for plugin output.
 
 ## Change checklist

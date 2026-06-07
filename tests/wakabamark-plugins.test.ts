@@ -37,6 +37,39 @@ describe('WakabamarkEngine plugins', () => {
     assert.equal(engine.extractPlainText('Hello @alice.'), 'Hello @alice.');
   });
 
+  it('allows plugins to emit nested built-in inline containers', () => {
+    const styledPlugin: WakabamarkEnginePlugin = {
+      name: 'styled',
+      parseInline: ({ input, start }) => {
+        if (!input.startsWith(':sparkle:', start)) {
+          return null;
+        }
+
+        return {
+          nodes: [
+            {
+              type: 'strong',
+              children: [
+                {
+                  type: 'emphasis',
+                  children: [{ type: 'text', value: 'shine' }],
+                },
+              ],
+            },
+          ],
+          nextIndex: start + ':sparkle:'.length,
+        };
+      },
+    };
+
+    const engine = new WakabamarkEngine({
+      plugins: [styledPlugin],
+    });
+
+    assert.equal(engine.renderHtml(':sparkle:'), '<p><strong><em>shine</em></strong></p>');
+    assert.equal(engine.renderMarkdown(':sparkle:'), '***shine***');
+  });
+
   it('prefers higher-priority plugins when multiple plugins match the same input', () => {
     const lowPriorityPlugin: WakabamarkEnginePlugin = {
       name: 'low-priority',

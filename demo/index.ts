@@ -4,6 +4,7 @@ import { WakabamarkEngine } from '../src/index.ts';
   const wakabamarkEngine = new WakabamarkEngine({
     features: {
       spoilers: true,
+      bbCodes: true,
       postReferences: true,
     },
     html: {

@@ -35,10 +35,23 @@ export type InlineNode =
   | TextNode
   | EmphasisNode
   | StrongNode
+  | UnderlineNode
+  | StrikethroughNode
   | SpoilerNode
+  | SuperscriptNode
+  | SubscriptNode
   | CodeSpanNode
   | LinkNode
   | PostReferenceNode;
+
+export type InlineContainerNode =
+  | EmphasisNode
+  | StrongNode
+  | UnderlineNode
+  | StrikethroughNode
+  | SpoilerNode
+  | SuperscriptNode
+  | SubscriptNode;
 
 export type TextNode = {
   type: 'text';
@@ -47,17 +60,37 @@ export type TextNode = {
 
 export type EmphasisNode = {
   type: 'emphasis';
-  children: TextNode[];
+  children: InlineNode[];
 };
 
 export type StrongNode = {
   type: 'strong';
-  children: TextNode[];
+  children: InlineNode[];
+};
+
+export type UnderlineNode = {
+  type: 'underline';
+  children: InlineNode[];
+};
+
+export type StrikethroughNode = {
+  type: 'strikethrough';
+  children: InlineNode[];
 };
 
 export type SpoilerNode = {
   type: 'spoiler';
-  children: TextNode[];
+  children: InlineNode[];
+};
+
+export type SuperscriptNode = {
+  type: 'superscript';
+  children: InlineNode[];
+};
+
+export type SubscriptNode = {
+  type: 'subscript';
+  children: InlineNode[];
 };
 
 export type CodeSpanNode = {
@@ -83,6 +116,7 @@ export type WakabamarkAst = DocumentNode;
 export type WakabamarkFeatureOptions = {
   postReferences?: boolean;
   spoilers?: boolean;
+  bbCodes?: boolean;
 };
 
 export type WakabamarkInlinePluginContext = {
@@ -91,6 +125,7 @@ export type WakabamarkInlinePluginContext = {
   features: Readonly<{
     postReferences: boolean;
     spoilers: boolean;
+    bbCodes: boolean;
   }>;
   resolvePostReferenceHref: (postId: string) => string;
 };
@@ -132,6 +167,7 @@ export type ResolvedWakabamarkEngineOptions = {
   features: {
     postReferences: boolean;
     spoilers: boolean;
+    bbCodes: boolean;
   };
   html: {
     blockquoteClassName: string;

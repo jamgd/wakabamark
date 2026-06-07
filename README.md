@@ -11,6 +11,7 @@ The demo is available here - https://jamgd.github.io/wakabamark/
 - Single newlines inside a paragraph are preserved as line breaks in HTML output
 - Markdown output from the same AST as HTML output
 - Opt-in spoiler support
+- Opt-in BBCode support for `[B]`, `[I]`, `[U]`, `[S]`, `[SPOILER]`, `[SUP]`, and `[SUB]`
 - Inline plugin support through `WakabamarkEnginePlugin`
 - Hard denylist for unsafe URL schemes such as `javascript:`
 
@@ -27,17 +28,18 @@ const engine = new WakabamarkEngine({
   features: {
     postReferences: true,
     spoilers: true,
+    bbCodes: true,
   },
   resolvePostReferenceHref: postId => `/thread/42#reply-${postId}`,
 });
 
-const html = engine.renderHtml('%%secret%% >>123');
-const markdown = engine.renderMarkdown('%%secret%% >>123');
+const html = engine.renderHtml('%%secret%% [B]>>123[/B] [SUP]2[/SUP]');
+const markdown = engine.renderMarkdown('%%secret%% [B]>>123[/B] [SUP]2[/SUP]');
 ```
 
 ## Plugins
 
-Plugins are currently inline-only. A `WakabamarkEnginePlugin` may recognize custom syntax in `parseInline()` and return built-in inline nodes such as `text`, `strong`, `link`, or `code-span`.
+Plugins are currently inline-only. A `WakabamarkEnginePlugin` may recognize custom syntax in `parseInline()` and return built-in inline nodes such as `text`, `strong`, `underline`, `spoiler`, `link`, or `code-span`.
 
 ```ts
 import {
@@ -97,6 +99,7 @@ class WakabamarkEngine {
 
 - `features.postReferences`: enable or disable `>>123` post-reference parsing, disabled by default
 - `features.spoilers`: enable or disable `%%spoiler%%`, disabled by default
+- `features.bbCodes`: enable or disable BBCode parsing for `[B]`, `[I]`, `[U]`, `[S]`, `[SPOILER]`, `[SUP]`, and `[SUB]`, disabled by default
 - `resolvePostReferenceHref(postId)`: customize the href for `>>123` when post-reference parsing is enabled
 - `plugins`: register `WakabamarkEnginePlugin[]` for custom inline syntax
 - `allowedUrlProtocols`: allowed external protocols, still filtered by an internal unsafe-scheme denylist

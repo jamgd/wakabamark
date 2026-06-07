@@ -7,10 +7,10 @@ import {
   UNSAFE_URL_PROTOCOLS,
 } from './constants.js';
 import type {
+  InlineContainerNode,
   InlineNode,
   ResolvedWakabamarkEngineOptions,
   ResolvedWakabamarkEnginePlugin,
-  TextNode,
   WakabamarkEngineOptions,
   WakabamarkEnginePlugin,
   WakabamarkInlinePluginMatch,
@@ -79,6 +79,7 @@ export function resolveWakabamarkEngineOptions(options: WakabamarkEngineOptions 
     features: {
       postReferences: options.features?.postReferences ?? false,
       spoilers: options.features?.spoilers ?? false,
+      bbCodes: options.features?.bbCodes ?? false,
     },
     html: {
       blockquoteClassName: options.html?.blockquoteClassName ?? DEFAULT_BLOCKQUOTE_CLASS_NAME,
@@ -181,8 +182,12 @@ function assertValidInlineNode(
       return;
     case 'emphasis':
     case 'strong':
+    case 'underline':
+    case 'strikethrough':
     case 'spoiler':
-      assertValidTextChildren(pluginName, (node as { children?: TextNode[] }).children, typedNode.type);
+    case 'superscript':
+    case 'subscript':
+      assertValidInlineChildren(pluginName, (node as { children?: InlineNode[] }).children, typedNode.type, options);
       return;
     case 'code-span':
       if (typeof (node as { value?: unknown }).value !== 'string') {
@@ -221,29 +226,19 @@ function assertValidInlineNode(
   );
 }
 
-function assertValidTextChildren(
+function assertValidInlineChildren(
   pluginName: string,
   children: unknown,
-  nodeType: 'emphasis' | 'strong' | 'spoiler',
+  nodeType: InlineContainerNode['type'],
+  options: Readonly<ResolvedWakabamarkEngineOptions>,
 ): void {
   if (!Array.isArray(children)) {
-    throw new Error(`Plugin "${pluginName}" returned a ${nodeType} node without text children.`);
+    throw new Error(`Plugin "${pluginName}" returned a ${nodeType} node without inline children.`);
   }
 
   for (const child of children) {
-    if (!isTextNode(child)) {
-      throw new Error(`Plugin "${pluginName}" returned a ${nodeType} node with a non-text child.`);
-    }
+    assertValidInlineNode(pluginName, child, options);
   }
-}
-
-function isTextNode(node: unknown): node is TextNode {
-  return (
-    typeof node === 'object' &&
-    node !== null &&
-    (node as { type?: unknown }).type === 'text' &&
-    typeof (node as { value?: unknown }).value === 'string'
-  );
 }
 
 function hasControlCharacter(value: string): boolean {
@@ -262,15 +257,10 @@ export function isSafePluginHref(href: string, allowedUrlProtocols: readonly str
     return false;
   }
 
-  // Browsers strip ASCII tab/newline/CR while resolving URLs, so a value such as "java\tscript:"
-  // would re-form "javascript:" once the stripped control char is gone. Reject all C0 controls +
-  // DEL before the scheme test, which would otherwise misclassify these as harmless relative URLs.
   if (hasControlCharacter(href)) {
     return false;
   }
 
-  // Protocol-relative URLs ("//host/...") carry no scheme, so the checks below never see them,
-  // yet they navigate off-origin. Treat them as unsafe rather than as a harmless relative path.
   if (href.startsWith('//')) {
     return false;
   }
@@ -306,6 +296,9 @@ export function escapeHtmlAttribute(value: string): string {
   return escapeHtml(value);
 }
 
+const TRAILING_URL_PUNCTUATION = /[),.;:!?]+$/;
+const INTERNAL_BACKTICK_RUN_PATTERN = /`+/g;
+
 export function escapeMarkdownText(value: string): string {
   return value.replace(/[\\`*_[\]<]/g, match => `\\${match}`);
 }
@@ -318,32 +311,34 @@ export function escapeMarkdownLinkDestination(value: string): string {
   return value.replace(/[()\s]/g, match => encodeURIComponent(match));
 }
 
-// A Markdown `<...>` autolink terminates at the first ">" and may not contain "<", ">", spaces, or
-// control characters. When the href would break that form, the caller should emit "[text](dest)".
-export function isMarkdownAutolinkSafe(href: string): boolean {
-  for (let index = 0; index < href.length; index += 1) {
-    const code = href.charCodeAt(index);
-    if (code <= 0x20 || code === 0x3c || code === 0x3e || code === 0x7f) {
-      return false;
-    }
-  }
+export function trimTrailingUrlPunctuation(value: string): string {
+  let candidate = value;
 
-  return true;
+  while (true) {
+    const trimmed = candidate.replace(TRAILING_URL_PUNCTUATION, '');
+    if (trimmed === candidate) {
+      return candidate;
+    }
+
+    candidate = trimmed;
+  }
+}
+
+export function isMarkdownAutolinkSafe(value: string): boolean {
+  return !/[<>\s]/.test(value);
 }
 
 export function renderMarkdownCodeSpan(value: string): string {
-  // Fold instead of Math.max(...array): spreading hundreds of thousands of backtick-run lengths can
-  // exceed the engine's argument limit and throw a RangeError.
-  let maxBacktickRun = 0;
-  for (const match of value.matchAll(/`+/g)) {
-    maxBacktickRun = Math.max(maxBacktickRun, match[0].length);
+  let longestRun = 0;
+  INTERNAL_BACKTICK_RUN_PATTERN.lastIndex = 0;
+
+  for (const match of value.matchAll(INTERNAL_BACKTICK_RUN_PATTERN)) {
+    const run = match[0].length;
+    if (run > longestRun) {
+      longestRun = run;
+    }
   }
 
-  const fence = '`'.repeat(maxBacktickRun + 1);
-
+  const fence = '`'.repeat(longestRun + 1);
   return `${fence}${value}${fence}`;
-}
-
-export function trimTrailingUrlPunctuation(value: string): string {
-  return value.replace(/[),.!?]+$/g, '');
 }

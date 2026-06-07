@@ -4,6 +4,7 @@ import type {
   BlockQuoteNode,
   CodeBlockNode,
   EmphasisNode,
+  InlineContainerNode,
   InlineNode,
   LinkNode,
   ListItemNode,
@@ -13,7 +14,6 @@ import type {
   ResolvedWakabamarkEngineOptions,
   SpoilerNode,
   StrongNode,
-  TextNode,
   WakabamarkAst,
   WakabamarkEngineOptions,
 } from './types.js';
@@ -39,6 +39,18 @@ import {
   resolveWakabamarkEngineOptions,
   trimTrailingUrlPunctuation,
 } from './utils.js';
+
+const BBCODE_TO_NODE_TYPE = {
+  b: 'strong',
+  i: 'emphasis',
+  u: 'underline',
+  s: 'strikethrough',
+  spoiler: 'spoiler',
+  sup: 'superscript',
+  sub: 'subscript',
+} as const;
+
+type SupportedBbCodeTagName = keyof typeof BBCODE_TO_NODE_TYPE;
 
 export class WakabamarkEngine {
   private readonly options: Readonly<ResolvedWakabamarkEngineOptions>;
@@ -136,11 +148,21 @@ function renderInlineHtml(node: InlineNode, options: Readonly<ResolvedWakabamark
     case 'text':
       return renderHtmlTextValue(node.value);
     case 'emphasis':
-      return `<em>${node.children.map(renderTextChildHtml).join('')}</em>`;
+      return renderContainerHtml('em', node.children, options);
     case 'strong':
-      return `<strong>${node.children.map(renderTextChildHtml).join('')}</strong>`;
+      return renderContainerHtml('strong', node.children, options);
+    case 'underline':
+      return renderContainerHtml('u', node.children, options);
+    case 'strikethrough':
+      return renderContainerHtml('s', node.children, options);
     case 'spoiler':
-      return `<span class="${escapeHtmlAttribute(options.html.spoilerClassName)}">${node.children.map(renderTextChildHtml).join('')}</span>`;
+      return `<span class="${escapeHtmlAttribute(options.html.spoilerClassName)}">${node.children
+        .map(child => renderInlineHtml(child, options))
+        .join('')}</span>`;
+    case 'superscript':
+      return renderContainerHtml('sup', node.children, options);
+    case 'subscript':
+      return renderContainerHtml('sub', node.children, options);
     case 'code-span':
       return `<code>${escapeHtml(node.value)}</code>`;
     case 'link': {
@@ -162,12 +184,12 @@ function renderInlineHtml(node: InlineNode, options: Readonly<ResolvedWakabamark
   }
 }
 
-function renderTextChildHtml(node: TextNode): string {
-  return renderHtmlTextValue(node.value);
-}
-
-function renderTextChildMarkdown(node: TextNode): string {
-  return escapeMarkdownText(node.value);
+function renderContainerHtml(
+  tagName: 'em' | 'strong' | 'u' | 's' | 'sup' | 'sub',
+  children: InlineNode[],
+  options: Readonly<ResolvedWakabamarkEngineOptions>,
+): string {
+  return `<${tagName}>${children.map(child => renderInlineHtml(child, options)).join('')}</${tagName}>`;
 }
 
 function renderInlineLinesHtml(lines: InlineNode[][], options: Readonly<ResolvedWakabamarkEngineOptions>): string {
@@ -228,11 +250,19 @@ function renderInlineMarkdown(node: InlineNode): string {
     case 'text':
       return escapeMarkdownText(node.value);
     case 'emphasis':
-      return `*${node.children.map(renderTextChildMarkdown).join('')}*`;
+      return `*${renderInlineChildrenMarkdown(node.children)}*`;
     case 'strong':
-      return `**${node.children.map(renderTextChildMarkdown).join('')}**`;
+      return `**${renderInlineChildrenMarkdown(node.children)}**`;
+    case 'underline':
+      return `<u>${renderInlineChildrenMarkdown(node.children)}</u>`;
+    case 'strikethrough':
+      return `<s>${renderInlineChildrenMarkdown(node.children)}</s>`;
     case 'spoiler':
-      return `>!${node.children.map(renderTextChildMarkdown).join('')}!<`;
+      return `<span class="wakabamark-spoiler">${renderInlineChildrenMarkdown(node.children)}</span>`;
+    case 'superscript':
+      return `<sup>${renderInlineChildrenMarkdown(node.children)}</sup>`;
+    case 'subscript':
+      return `<sub>${renderInlineChildrenMarkdown(node.children)}</sub>`;
     case 'code-span':
       return renderMarkdownCodeSpan(node.value);
     case 'link':
@@ -244,14 +274,22 @@ function renderInlineMarkdown(node: InlineNode): string {
   }
 }
 
+function renderInlineChildrenMarkdown(children: InlineNode[]): string {
+  return children.map(renderInlineMarkdown).join('');
+}
+
 function extractInlinePlainText(node: InlineNode): string {
   switch (node.type) {
     case 'text':
       return node.value;
     case 'emphasis':
     case 'strong':
+    case 'underline':
+    case 'strikethrough':
     case 'spoiler':
-      return node.children.map(child => child.value).join('');
+    case 'superscript':
+    case 'subscript':
+      return node.children.map(extractInlinePlainText).join('');
     case 'code-span':
       return node.value;
     case 'link':
@@ -326,7 +364,16 @@ function parseInline(input: string, options: Readonly<ResolvedWakabamarkEngineOp
       continue;
     }
 
-    const strong = tryParseDelimitedText(input, cursor, ['**', '__'], 'strong');
+    const bbcode = tryParseBbCode(input, cursor, options);
+    if (bbcode) {
+      pushPendingText(nodes, input, textStart, cursor);
+      nodes.push(bbcode.node);
+      cursor = bbcode.nextIndex;
+      textStart = cursor;
+      continue;
+    }
+
+    const strong = tryParseDelimitedText(input, cursor, ['**', '__'], options, 'strong');
     if (strong) {
       pushPendingText(nodes, input, textStart, cursor);
       nodes.push(strong.node);
@@ -335,7 +382,7 @@ function parseInline(input: string, options: Readonly<ResolvedWakabamarkEngineOp
       continue;
     }
 
-    const emphasis = tryParseDelimitedText(input, cursor, ['*', '_'], 'emphasis');
+    const emphasis = tryParseDelimitedText(input, cursor, ['*', '_'], options, 'emphasis');
     if (emphasis) {
       pushPendingText(nodes, input, textStart, cursor);
       nodes.push(emphasis.node);
@@ -587,8 +634,6 @@ function tryParsePostReference(
     return null;
   }
 
-  // The resolver is developer-supplied, so route its href through the same safety check that core
-  // applies to autolinks and plugin output. If it is unsafe, fall back to rendering ">>NNN" as text.
   const href = options.resolvePostReferenceHref(postId);
   if (!isSafePluginHref(href, options.allowedUrlProtocols)) {
     return null;
@@ -604,13 +649,6 @@ function tryParsePostReference(
   };
 }
 
-// Two independent O(n^2) hazards live here, both hit once per cursor position by parseInline:
-//   1. `input.slice(start)` allocated the whole remaining tail every call -> the sticky ('y') flag
-//      anchors exec() at lastIndex with no slice.
-//   2. an unbounded `[a-z0-9+.-]*` before `://` greedily consumes (then backtracks across) an entire
-//      run of scheme-legal chars before failing -> bound it so a non-URL run fails in O(1) per
-//      position. No real URL scheme approaches 64 chars, so this rejects nothing legitimate.
-// Module-scoped and reset before each use; parsing is synchronous, so the shared lastIndex is safe.
 const AUTOLINK_PATTERN = /[a-z][a-z0-9+.-]{0,63}:\/\/[^\s<]+/iy;
 
 function tryParseUrl(
@@ -659,6 +697,7 @@ function tryParseDelimitedText(
   input: string,
   start: number,
   delimiters: readonly string[],
+  options: Readonly<ResolvedWakabamarkEngineOptions>,
   type: EmphasisNode['type'] | StrongNode['type'],
 ): { node: EmphasisNode | StrongNode; nextIndex: number } | null {
   for (const delimiter of delimiters) {
@@ -671,14 +710,13 @@ function tryParseDelimitedText(
       continue;
     }
 
-    const value = input.slice(start + delimiter.length, closingIndex);
-    const textChild: TextNode = { type: 'text', value };
+    const children = parseInline(input.slice(start + delimiter.length, closingIndex), options);
 
     if (type === 'strong') {
       return {
         node: {
           type: 'strong',
-          children: [textChild],
+          children,
         },
         nextIndex: closingIndex + delimiter.length,
       };
@@ -687,7 +725,7 @@ function tryParseDelimitedText(
     return {
       node: {
         type: 'emphasis',
-        children: [textChild],
+        children,
       },
       nextIndex: closingIndex + delimiter.length,
     };
@@ -714,13 +752,86 @@ function tryParseSpoiler(
   return {
     node: {
       type: 'spoiler',
-      children: [
-        {
-          type: 'text',
-          value: input.slice(contentStart, closingIndex),
-        },
-      ],
+      children: parseInline(input.slice(contentStart, closingIndex), options),
     },
     nextIndex: closingIndex + SPOILER_DELIMITER.length,
   };
+}
+
+function tryParseBbCode(
+  input: string,
+  start: number,
+  options: Readonly<ResolvedWakabamarkEngineOptions>,
+): { node: InlineContainerNode; nextIndex: number } | null {
+  if (!options.features.bbCodes || input[start] !== '[') {
+    return null;
+  }
+
+  const openingTag = tryParseBbCodeOpeningTag(input, start);
+  if (!openingTag) {
+    return null;
+  }
+
+  const closingIndex = findMatchingBbCodeClosingTag(input, openingTag.name, openingTag.nextIndex);
+  if (closingIndex === -1) {
+    return null;
+  }
+
+  const children = parseInline(input.slice(openingTag.nextIndex, closingIndex), options);
+
+  return {
+    node: {
+      type: BBCODE_TO_NODE_TYPE[openingTag.name],
+      children,
+    },
+    nextIndex: closingIndex + openingTag.name.length + 3,
+  };
+}
+
+function tryParseBbCodeOpeningTag(
+  input: string,
+  start: number,
+): { name: SupportedBbCodeTagName; nextIndex: number } | null {
+  const match = /^\[([a-z]+)\]/i.exec(input.slice(start));
+  const name = match?.[1]?.toLowerCase();
+  if (!match || !isSupportedBbCodeTagName(name)) {
+    return null;
+  }
+
+  return {
+    name,
+    nextIndex: start + match[0].length,
+  };
+}
+
+function findMatchingBbCodeClosingTag(input: string, name: SupportedBbCodeTagName, start: number): number {
+  const tagPattern = /\[(\/)?([a-z]+)\]/gi;
+  tagPattern.lastIndex = start;
+  let depth = 1;
+
+  while (true) {
+    const match = tagPattern.exec(input);
+    const matchedName = match?.[2]?.toLowerCase();
+    if (!match || !isSupportedBbCodeTagName(matchedName)) {
+      return -1;
+    }
+
+    if (matchedName !== name) {
+      continue;
+    }
+
+    if (match[1] === '/') {
+      depth -= 1;
+      if (depth === 0) {
+        return match.index;
+      }
+      continue;
+    }
+
+    depth += 1;
+  }
+}
+
+function isSupportedBbCodeTagName(value: string | undefined): value is SupportedBbCodeTagName {
+  return value !== undefined && value in BBCODE_TO_NODE_TYPE;
 }
